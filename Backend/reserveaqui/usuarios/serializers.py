@@ -23,7 +23,10 @@ class UsuarioSerializer(serializers.ModelSerializer):
         """Criar novo usuário com a senha"""
         validated_data.pop('password_confirm')
         password = validated_data.pop('password')
-        usuario = Usuario.objects.create_user(**validated_data, password=password)
+        # Gerar username a partir do email
+        email = validated_data.get('email')
+        username = email.split('@')[0]  # Usa a parte antes do @ como username
+        usuario = Usuario.objects.create_user(username=username, **validated_data, password=password)
         return usuario
 
 
