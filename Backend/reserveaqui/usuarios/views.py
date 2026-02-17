@@ -40,7 +40,7 @@ class UsuarioViewSet(viewsets.ModelViewSet):
                     'id': usuario.id,
                     'email': usuario.email,
                     'nome': usuario.nome,
-                    'tipo': usuario.tipo,
+                    'papeis': [{'tipo': p.tipo, 'descricao': p.get_tipo_display()} for p in usuario.papeis.all()],
                 }
             }, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
