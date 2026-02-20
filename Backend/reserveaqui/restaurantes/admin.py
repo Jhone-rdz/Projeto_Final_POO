@@ -9,7 +9,7 @@ class RestauranteUsuarioInline(admin.TabularInline):
 
 @admin.register(Restaurante)
 class RestauranteAdmin(admin.ModelAdmin):
-    list_display = ('nome', 'cidade', 'proprietario', 'ativo', 'data_criacao')
+    list_display = ('nome', 'cidade', 'quantidade_mesas', 'proprietario', 'ativo', 'data_criacao')
     list_filter = ('ativo', 'cidade', 'data_criacao')
     search_fields = ('nome', 'cidade', 'email')
     readonly_fields = ('data_criacao', 'data_atualizacao')
@@ -17,7 +17,7 @@ class RestauranteAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Informações Básicas', {
-            'fields': ('nome', 'descricao', 'proprietario', 'ativo')
+            'fields': ('nome', 'descricao', 'proprietario', 'quantidade_mesas', 'ativo')
         }),
         ('Localização', {
             'fields': ('endereco', 'cidade', 'estado', 'cep')

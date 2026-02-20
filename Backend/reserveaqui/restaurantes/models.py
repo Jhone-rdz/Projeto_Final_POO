@@ -1,4 +1,6 @@
 from django.db import models
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from usuarios.models import Usuario
 
 
@@ -22,6 +24,13 @@ class Restaurante(models.Model):
         verbose_name="Proprietário"
     )
     
+    # Quantidade de mesas disponíveis no restaurante
+    quantidade_mesas = models.PositiveIntegerField(
+        default=10,
+        verbose_name="Quantidade de Mesas",
+        help_text="Número total de mesas (cada mesa comporta 4 pessoas)"
+    )
+    
     # Status do restaurante
     ativo = models.BooleanField(default=True, verbose_name="Ativo")
     data_criacao = models.DateTimeField(auto_now_add=True, verbose_name="Data de Criação")
@@ -34,6 +43,22 @@ class Restaurante(models.Model):
     
     def __str__(self):
         return f"{self.nome} ({self.cidade})"
+    
+    def criar_mesas(self):
+        """Cria as mesas automaticamente para o restaurante"""
+        from mesas.models import Mesa
+        
+        # Verifica quantas mesas já existem
+        mesas_existentes = self.mesas.count()
+        
+        # Cria apenas as mesas que faltam
+        for i in range(mesas_existentes + 1, self.quantidade_mesas + 1):
+            Mesa.objects.create(
+                restaurante=self,
+                numero=i,
+                status='disponivel',
+                ativa=True
+            )
 
 
 class RestauranteUsuario(models.Model):
@@ -73,3 +98,13 @@ class RestauranteUsuario(models.Model):
     
     def __str__(self):
         return f"{self.usuario.nome} - {self.restaurante.nome} ({self.get_papel_display()})"
+
+
+@receiver(post_save, sender=Restaurante)
+def criar_mesas_restaurante(sender, instance, created, **kwargs):
+    """Signal para criar mesas automaticamente quando um restaurante é criado ou atualizado"""
+    # Evitar recursão infinita
+    if not hasattr(instance, '_creating_mesas'):
+        instance._creating_mesas = True
+        instance.criar_mesas()
+        delattr(instance, '_creating_mesas')

@@ -35,6 +35,8 @@ class RestauranteModelTest(TestCase):
         self.assertEqual(restaurante.proprietario, self.usuario)
         self.assertTrue(restaurante.ativo)
         self.assertIsNotNone(restaurante.data_criacao)
+        # Verifica que mesas foram criadas automaticamente (quantidade_mesas default = 10)
+        self.assertEqual(restaurante.mesas.count(), 10)
     
     def test_restaurante_str(self):
         """Teste da representação em string do restaurante"""
@@ -72,6 +74,42 @@ class RestauranteModelTest(TestCase):
                 email='unico@rest.com',
                 proprietario=self.usuario
             )
+
+
+    def test_criacao_automatica_mesas(self):
+        """Teste que mesas são criadas automaticamente ao criar restaurante"""
+        restaurante = Restaurante.objects.create(
+            nome='Restaurante com Mesas',
+            endereco='Rua Test',
+            cidade='Test City',
+            estado='TC',
+            cep='99999-999',
+            email='mesas@test.com',
+            proprietario=self.usuario,
+            quantidade_mesas=15
+        )
+        
+        # Verifica que 15 mesas foram criadas
+        self.assertEqual(restaurante.mesas.count(), 15)
+        
+        # Verifica que todas têm capacidade de 4
+        for mesa in restaurante.mesas.all():
+            self.assertEqual(mesa.capacidade, 4)
+    
+    def test_quantidade_mesas_default(self):
+        """Teste que quantidade de mesas padrão é 10"""
+        restaurante = Restaurante.objects.create(
+            nome='Restaurante Default',
+            endereco='Rua Default',
+            cidade='Default City',
+            estado='DC',
+            cep='00000-000',
+            email='default@test.com',
+            proprietario=self.usuario
+        )
+        
+        self.assertEqual(restaurante.quantidade_mesas, 10)
+        self.assertEqual(restaurante.mesas.count(), 10)
 
 
 class RestauranteUsuarioModelTest(TestCase):
