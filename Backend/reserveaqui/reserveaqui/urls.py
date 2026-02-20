@@ -16,8 +16,21 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from rest_framework_simplejwt.views import TokenRefreshView
+
+# Importar ViewSets
+from usuarios.views import UsuarioViewSet
+from restaurantes.views import RestauranteViewSet, RestauranteUsuarioViewSet
+
+# Criar um único router principal
+router = DefaultRouter()
+router.register(r'usuarios', UsuarioViewSet, basename='usuario')
+router.register(r'restaurantes', RestauranteViewSet, basename='restaurante')
+router.register(r'restaurantes-usuarios', RestauranteUsuarioViewSet, basename='restaurante-usuario')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/', include('usuarios.urls')),
+    path('api/', include(router.urls)),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 ]
