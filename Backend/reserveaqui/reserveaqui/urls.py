@@ -22,12 +22,14 @@ from rest_framework_simplejwt.views import TokenRefreshView
 # Importar ViewSets
 from usuarios.views import UsuarioViewSet
 from restaurantes.views import RestauranteViewSet, RestauranteUsuarioViewSet
+from mesas.views import MesaViewSet
 
 # Criar um único router principal
 router = DefaultRouter()
 router.register(r'usuarios', UsuarioViewSet, basename='usuario')
 router.register(r'restaurantes', RestauranteViewSet, basename='restaurante')
 router.register(r'restaurantes-usuarios', RestauranteUsuarioViewSet, basename='restaurante-usuario')
+router.register(r'mesas', MesaViewSet, basename='mesa')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
