@@ -144,3 +144,22 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ALGORITHM': 'HS256',
 }
+# Email Configuration for Password Recovery (RF03)
+# Em desenvolvimento, usando console backend (imprime no console)
+# Em produção, configurar com SMTP real
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'  # Development
+DEFAULT_FROM_EMAIL = 'noreply@reserveaqui.com'
+
+# Configurar para produção (exemplo com Gmail):
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'smtp.gmail.com'
+# EMAIL_PORT = 587
+# EMAIL_USE_TLS = True
+# EMAIL_HOST_USER = 'seu_email@gmail.com'
+# EMAIL_HOST_PASSWORD = 'sua_senha_app'
+# DEFAULT_FROM_EMAIL = 'seu_email@gmail.com'
+
+# Frontend URL para links de recuperação
+# Em desenvolvimento: http://localhost:3000
+# Em produção: https://seu-dominio.com
+FRONTEND_URL = 'http://localhost:3000'

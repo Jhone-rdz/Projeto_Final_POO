@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import Usuario, Papel, UsuarioPapel
+from .models import Usuario, Papel, UsuarioPapel, PasswordResetToken
 
 
 @admin.register(Papel)
@@ -32,3 +32,16 @@ class UsuarioAdmin(UserAdmin):
     def get_papeis(self, obj):
         return ', '.join([p.get_tipo_display() for p in obj.papeis.all()])
     get_papeis.short_description = 'Papéis'
+
+@admin.register(PasswordResetToken)
+class PasswordResetTokenAdmin(admin.ModelAdmin):
+    list_display = ('email', 'usuario', 'data_criacao', 'data_expiracao', 'utilizado', 'esta_valido')
+    list_filter = ('utilizado', 'data_criacao', 'data_expiracao')
+    search_fields = ('email', 'usuario__email', 'token')
+    readonly_fields = ('token', 'data_criacao', 'data_expiracao')
+    ordering = ('-data_criacao',)
+    
+    def esta_valido(self, obj):
+        return obj.esta_valido()
+    esta_valido.short_description = 'Token Válido'
+    esta_valido.boolean = True

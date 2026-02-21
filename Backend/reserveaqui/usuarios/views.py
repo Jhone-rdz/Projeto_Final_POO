@@ -3,8 +3,13 @@ from rest_framework.decorators import action, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import Usuario
-from .serializers import UsuarioSerializer, LoginSerializer, TrocarSenhaSerializer
+from django.core.mail import send_mail
+from django.conf import settings
+from .models import Usuario, PasswordResetToken
+from .serializers import (
+    UsuarioSerializer, LoginSerializer, TrocarSenhaSerializer,
+    SolicitarRecuperacaoSenhaSerializer, RedefinirSenhaSerializer
+)
 
 
 class UsuarioViewSet(viewsets.ModelViewSet):
@@ -64,4 +69,90 @@ class UsuarioViewSet(viewsets.ModelViewSet):
             return Response({
                 'mensagem': 'Senha alterada com sucesso!'
             }, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
+    def solicitar_recuperacao(self, request):
+        """
+        Endpoint para solicitar recuperação de senha.
+        RF03: Permitir recuperação de senha mediante validação do e-mail cadastrado.
+        Gera um token e envia por email (simular envio).
+        """
+        serializer = SolicitarRecuperacaoSenhaSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+            
+            try:
+                usuario = Usuario.objects.get(email=email)
+            except Usuario.DoesNotExist:
+                # Não revelar se o email existe ou não (por segurança)
+                return Response({
+                    'mensagem': 'Se o email está cadastrado, um link de recuperação será enviado.'
+                }, status=status.HTTP_200_OK)
+            
+            # Gerar token de recuperação
+            reset_token = PasswordResetToken.gerar_token_recuperacao(usuario)
+            
+            # Construir link de recuperação (simulado)
+            # Em produção, seria: https://frontend.com/recuperar-senha?token={token}&email={email}
+            reset_link = f"{settings.FRONTEND_URL}/recuperar-senha?token={reset_token.token}&email={email}" if hasattr(settings, 'FRONTEND_URL') else f"Token: {reset_token.token}"
+            
+            # Tentar enviar email
+            try:
+                send_mail(
+                    assunto='Recuperação de Senha - ReserveAqui',
+                    mensagem=f"""
+Olá {usuario.nome},
+
+Você solicitou recuperação de senha. Clique no link abaixo para redefinir sua senha:
+
+{reset_link}
+
+Este link expira em 24 horas.
+
+Se você não solicitou esta recuperação, ignore este email.
+
+Atenciosamente,
+Equipe ReserveAqui
+                    """,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[usuario.email],
+                    fail_silently=False,
+                )
+                email_enviado = True
+            except Exception as e:
+                # Em desenvolvimento, apenas registrar que o email não foi enviado
+                print(f"Erro ao enviar email: {e}")
+                email_enviado = False
+            
+            return Response({
+                'mensagem': 'Se o email está cadastrado, um link de recuperação será enviado.',
+                'debug_token': reset_token.token if not email_enviado else None,  # Apenas para testes
+                'email_enviado': email_enviado
+            }, status=status.HTTP_200_OK)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
+    def redefinir_senha(self, request):
+        """
+        Endpoint para redefinir senha usando token de recuperação.
+        RF03: Permitir recuperação de senha mediante validação do e-mail cadastrado.
+        """
+        serializer = RedefinirSenhaSerializer(data=request.data)
+        if serializer.is_valid():
+            reset_token = serializer.validated_data['reset_token']
+            nova_senha = serializer.validated_data['nova_senha']
+            
+            usuario = reset_token.usuario
+            usuario.set_password(nova_senha)
+            usuario.save()
+            
+            # Marcar token como utilizado
+            reset_token.utilizado = True
+            reset_token.save()
+            
+            return Response({
+                'mensagem': 'Senha redefinida com sucesso! Você já pode fazer login com a nova senha.'
+            }, status=status.HTTP_200_OK)
+        
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

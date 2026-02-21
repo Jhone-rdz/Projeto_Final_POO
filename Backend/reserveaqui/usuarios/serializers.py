@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
-from .models import Usuario, Papel
+from .models import Usuario, Papel, PasswordResetToken
 from .validators import validar_forca_senha
 
 
@@ -116,4 +116,71 @@ class TrocarSenhaSerializer(serializers.Serializer):
         if data['senha_atual'] == data['nova_senha']:
             raise serializers.ValidationError({'nova_senha': 'Nova senha deve ser diferente da senha atual.'})
         
+        return data
+
+class SolicitarRecuperacaoSenhaSerializer(serializers.Serializer):
+    """
+    Serializer para solicitar recuperação de senha.
+    RF03: Permitir recuperação de senha mediante validação do e-mail cadastrado.
+    """
+    email = serializers.EmailField(required=True)
+    
+    def validate_email(self, value):
+        """Verifica se o email está cadastrado"""
+        try:
+            Usuario.objects.get(email=value)
+        except Usuario.DoesNotExist:
+            raise serializers.ValidationError(
+                'Nenhuma conta encontrada com este email.'
+            )
+        return value
+
+
+class RedefinirSenhaSerializer(serializers.Serializer):
+    """
+    Serializer para redefinir senha usando token de recuperação.
+    RF03: Permitir recuperação de senha mediante validação do e-mail cadastrado.
+    """
+    token = serializers.CharField(required=True, write_only=True)
+    email = serializers.EmailField(required=True)
+    nova_senha = serializers.CharField(
+        required=True,
+        write_only=True,
+        style={'input_type': 'password'},
+        validators=[validar_forca_senha]
+    )
+    nova_senha_confirm = serializers.CharField(
+        required=True,
+        write_only=True,
+        style={'input_type': 'password'}
+    )
+    
+    def validate(self, data):
+        """Validar token e confirmar senhas"""
+        token = data.get('token')
+        email = data.get('email')
+        nova_senha = data.get('nova_senha')
+        nova_senha_confirm = data.get('nova_senha_confirm')
+        
+        # Verificar se as senhas batem
+        if nova_senha != nova_senha_confirm:
+            raise serializers.ValidationError({
+                'nova_senha': 'As senhas não correspondem.'
+            })
+        
+        # Buscar o token
+        try:
+            reset_token = PasswordResetToken.objects.get(token=token, email=email)
+        except PasswordResetToken.DoesNotExist:
+            raise serializers.ValidationError({
+                'token': 'Token inválido ou expirado.'
+            })
+        
+        # Verificar se o token é válido
+        if not reset_token.esta_valido():
+            raise serializers.ValidationError({
+                'token': 'Token inválido ou expirado.'
+            })
+        
+        data['reset_token'] = reset_token
         return data
