@@ -5,6 +5,11 @@ import math
 from .models import Reserva, ReservaMesa, Notificacao
 from mesas.models import Mesa
 from restaurantes.models import Restaurante
+from .reports import (
+    RelatorioOcupacaoSerializer,
+    HorarioMovimentadoSerializer,
+    EstatisticasSerieSerializer
+)
 
 
 class ReservaMesaSerializer(serializers.ModelSerializer):

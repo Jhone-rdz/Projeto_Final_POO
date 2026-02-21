@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.utils import timezone
+from datetime import datetime, timedelta
 from .models import Reserva, ReservaMesa, Notificacao
 from .serializers import (
     ReservaSerializer,
@@ -13,6 +14,7 @@ from .serializers import (
     NotificacaoSerializer
 )
 from .permissions import IsOwnerOrAdminForReservas
+from .reports import RelatorioHelper, RelatorioOcupacaoSerializer, HorarioMovimentadoSerializer, EstatisticasSerieSerializer
 
 
 class ReservaViewSet(viewsets.ModelViewSet):
@@ -287,6 +289,215 @@ class ReservaViewSet(viewsets.ModelViewSet):
         }
         
         return Response(stats)
+    
+    @action(detail=False, methods=['get'])
+    def ocupacao(self, request):
+        """
+        RF13: Relatório de ocupação de mesas.
+        Apenas para admins.
+        
+        Query params:
+        - restaurante_id: filtrar por restaurante
+        - data_inicio: data de início (YYYY-MM-DD)
+        - data_fim: data de fim (YYYY-MM-DD)
+        """
+        # Verificar se é admin
+        is_admin = request.user.usuariopapel_set.filter(
+            papel__nome__in=['admin_sistema', 'admin_secundario']
+        ).exists()
+        
+        if not is_admin:
+            return Response(
+                {'error': 'Apenas administradores podem visualizar relatórios.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Extrair parâmetros
+        restaurante_id = request.query_params.get('restaurante_id')
+        data_inicio_str = request.query_params.get('data_inicio')
+        data_fim_str = request.query_params.get('data_fim')
+        
+        # Converter strings para dates
+        data_inicio = None
+        data_fim = None
+        
+        if data_inicio_str:
+            try:
+                data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
+            except ValueError:
+                return Response(
+                    {'error': 'Formato de data inválido. Use YYYY-MM-DD'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        if data_fim_str:
+            try:
+                data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
+            except ValueError:
+                return Response(
+                    {'error': 'Formato de data inválido. Use YYYY-MM-DD'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        # Gerar relatório
+        relatorio = RelatorioHelper.gerar_relatorio_ocupacao(
+            restaurante_id=restaurante_id,
+            data_inicio=data_inicio,
+            data_fim=data_fim
+        )
+        
+        serializer = RelatorioOcupacaoSerializer(relatorio, many=True)
+        
+        return Response({
+            'periodo_inicio': data_inicio or 'hoje',
+            'periodo_fim': data_fim or 'hoje',
+            'total_registros': len(relatorio),
+            'dados': serializer.data
+        })
+    
+    @action(detail=False, methods=['get'])
+    def horarios_movimentados(self, request):
+        """
+        RF13: Relatório de horários mais movimentados.
+        Apenas para admins.
+        
+        Query params:
+        - restaurante_id: filtrar por restaurante
+        - data_inicio: data de início (YYYY-MM-DD), padrão: últimos 30 dias
+        - data_fim: data de fim (YYYY-MM-DD), padrão: hoje
+        - top: quantidade de horários a retornar (padrão: 10)
+        """
+        # Verificar se é admin
+        is_admin = request.user.usuariopapel_set.filter(
+            papel__nome__in=['admin_sistema', 'admin_secundario']
+        ).exists()
+        
+        if not is_admin:
+            return Response(
+                {'error': 'Apenas administradores podem visualizar relatórios.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Extrair parâmetros
+        restaurante_id = request.query_params.get('restaurante_id')
+        data_inicio_str = request.query_params.get('data_inicio')
+        data_fim_str = request.query_params.get('data_fim')
+        top = int(request.query_params.get('top', 10))
+        
+        # Converter strings para dates
+        data_inicio = None
+        data_fim = None
+        
+        if data_inicio_str:
+            try:
+                data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
+            except ValueError:
+                return Response(
+                    {'error': 'Formato de data inválido. Use YYYY-MM-DD'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        if data_fim_str:
+            try:
+                data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
+            except ValueError:
+                return Response(
+                    {'error': 'Formato de data inválido. Use YYYY-MM-DD'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        # Gerar relatório
+        relatorio = RelatorioHelper.gerar_relatorio_horarios_movimentados(
+            restaurante_id=restaurante_id,
+            data_inicio=data_inicio,
+            data_fim=data_fim,
+            top=top
+        )
+        
+        serializer = HorarioMovimentadoSerializer(relatorio, many=True)
+        
+        return Response({
+            'periodo_inicio': data_inicio or 'últimos 30 dias',
+            'periodo_fim': data_fim or 'hoje',
+            'total_registros': len(relatorio),
+            'dados': serializer.data
+        })
+    
+    @action(detail=False, methods=['get'])
+    def estatisticas_periodo(self, request):
+        """
+        RF13: Estatísticas por período (dia, semana, mês).
+        Apenas para admins.
+        
+        Query params:
+        - restaurante_id: filtrar por restaurante
+        - data_inicio: data de início (YYYY-MM-DD), padrão: últimos 30 dias
+        - data_fim: data de fim (YYYY-MM-DD), padrão: hoje
+        - tipo_periodo: 'dia', 'semana' ou 'mes' (padrão: 'dia')
+        """
+        # Verificar se é admin
+        is_admin = request.user.usuariopapel_set.filter(
+            papel__nome__in=['admin_sistema', 'admin_secundario']
+        ).exists()
+        
+        if not is_admin:
+            return Response(
+                {'error': 'Apenas administradores podem visualizar relatórios.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Extrair parâmetros
+        restaurante_id = request.query_params.get('restaurante_id')
+        data_inicio_str = request.query_params.get('data_inicio')
+        data_fim_str = request.query_params.get('data_fim')
+        tipo_periodo = request.query_params.get('tipo_periodo', 'dia')
+        
+        # Validar tipo_periodo
+        if tipo_periodo not in ['dia', 'semana', 'mes']:
+            return Response(
+                {'error': "tipo_periodo deve ser 'dia', 'semana' ou 'mes'"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Converter strings para dates
+        data_inicio = None
+        data_fim = None
+        
+        if data_inicio_str:
+            try:
+                data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
+            except ValueError:
+                return Response(
+                    {'error': 'Formato de data inválido. Use YYYY-MM-DD'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        if data_fim_str:
+            try:
+                data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
+            except ValueError:
+                return Response(
+                    {'error': 'Formato de data inválido. Use YYYY-MM-DD'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        # Gerar relatório
+        relatorio = RelatorioHelper.gerar_relatorio_estatisticas_periodo(
+            restaurante_id=restaurante_id,
+            data_inicio=data_inicio,
+            data_fim=data_fim,
+            tipo_periodo=tipo_periodo
+        )
+        
+        serializer = EstatisticasSerieSerializer(relatorio, many=True)
+        
+        return Response({
+            'periodo_inicio': data_inicio or 'últimos 30 dias',
+            'periodo_fim': data_fim or 'hoje',
+            'tipo_periodo': tipo_periodo,
+            'total_registros': len(relatorio),
+            'dados': serializer.data
+        })
 
 class NotificacaoViewSet(viewsets.ReadOnlyModelViewSet):
     """
