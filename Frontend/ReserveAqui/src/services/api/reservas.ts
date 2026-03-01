@@ -1,5 +1,5 @@
 import api from './config';
-import { Reserva, CriarReservaDTO, AtualizarReservaDTO, PaginatedResponse } from '../../types';
+import type { Reserva, CriarReservaDTO, AtualizarReservaDTO, PaginatedResponse } from '../../types';
 
 /**
  * Serviços para gerenciamento de reservas

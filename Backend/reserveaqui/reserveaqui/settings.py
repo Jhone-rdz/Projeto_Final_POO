@@ -172,11 +172,13 @@ EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@reserveaqui.com')
 
 # Frontend URL para links de recuperação de senha
+FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
+
 # CORS Configuration para React + TypeScript Frontend
 # Permite requisições cross-origin do frontend
 CORS_ALLOWED_ORIGINS = config(
     'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:3000,http://localhost:8000,http://127.0.0.1:3000,http://127.0.0.1:8000',
+    default='http://localhost:3000,http://localhost:8000,http://127.0.0.1:3000,http://127.0.0.1:8000,http://127.0.0.1:5500,http://localhost:5500',
     cast=Csv()
 )
 
@@ -187,7 +189,7 @@ CORS_ALLOWED_ORIGINS = config(
 # ]
 
 # Em desenvolvimento, permitir todos (CUIDADO: apenas para desenvolvimento!)
-# CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = True
 
 # Configurações adicionais de CORS
 CORS_ALLOW_CREDENTIALS = True

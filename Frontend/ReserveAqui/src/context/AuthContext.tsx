@@ -1,11 +1,12 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Usuario, LoginResponse } from '../types';
+import { createContext, useContext, useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
+import type { Usuario, LoginResponse } from '../types';
 import { authService } from '../services/api';
 
 /**
  * Interface do contexto de autenticação
  */
-interface AuthContextType {
+export interface AuthContextType {
   // Estado
   usuario: Usuario | null;
   isAuthenticated: boolean;
@@ -105,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
 
     try {
-      const response = await authService.cadastro(userData);
+      await authService.cadastro(userData);
       
       // Fazer login automático após cadastro
       await login(userData.email, userData.password);

@@ -1,5 +1,5 @@
 import api from './config';
-import { Mesa, PaginatedResponse } from '../../types';
+import type { Mesa, PaginatedResponse } from '../../types';
 
 /**
  * Serviços para gerenciamento de mesas

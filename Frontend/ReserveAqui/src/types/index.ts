@@ -147,6 +147,24 @@ export interface TokenRefreshResponse {
 }
 
 // ========================================
+// Notificação
+// ========================================
+
+export type TipoNotificacao = 'confirmacao' | 'cancelamento' | 'lembranca' | 'atualizacao';
+
+export interface Notificacao {
+  id: number;
+  usuario: number; // ID do usuário
+  reserva: number; // ID da reserva
+  tipo: TipoNotificacao;
+  titulo: string;
+  mensagem: string;
+  lido: boolean;
+  data_criacao: string;
+  data_leitura?: string | null;
+}
+
+// ========================================
 // Tipos auxiliares
 // ========================================
 

@@ -98,15 +98,14 @@ class UsuarioViewSet(viewsets.ModelViewSet):
             # Gerar token de recuperação
             reset_token = PasswordResetToken.gerar_token_recuperacao(usuario)
             
-            # Construir link de recuperação (simulado)
-            # Em produção, seria: https://frontend.com/recuperar-senha?token={token}&email={email}
-            reset_link = f"{settings.FRONTEND_URL}/recuperar-senha?token={reset_token.token}&email={email}" if hasattr(settings, 'FRONTEND_URL') else f"Token: {reset_token.token}"
+            # Construir link de recuperação
+            reset_link = f"{settings.FRONTEND_URL}/recuperacao.html?token={reset_token.token}&email={email}" if hasattr(settings, 'FRONTEND_URL') else f"Token: {reset_token.token}"
             
             # Tentar enviar email
             try:
                 send_mail(
-                    assunto='Recuperação de Senha - ReserveAqui',
-                    mensagem=f"""
+                    subject='Recuperação de Senha - ReserveAqui',
+                    message=f"""
 Olá {usuario.nome},
 
 Você solicitou recuperação de senha. Clique no link abaixo para redefinir sua senha:

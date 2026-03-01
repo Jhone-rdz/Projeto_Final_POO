@@ -1,5 +1,5 @@
 import api from './config';
-import { Usuario, LoginResponse, CriarUsuarioDTO } from '../../types';
+import type { Usuario, LoginResponse, CriarUsuarioDTO } from '../../types';
 
 /**
  * Serviços de autenticação e gerenciamento de usuários

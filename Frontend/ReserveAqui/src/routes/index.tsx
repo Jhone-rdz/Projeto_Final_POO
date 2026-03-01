@@ -2,12 +2,21 @@ import { createBrowserRouter } from 'react-router-dom';
 import { ProtectedRoute } from './ProtectedRoute';
 
 // Pages
-import Home from '../pages/home';
+import { Home } from '../pages/Home';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
+import RecuperarSenha from '../pages/RecuperarSenha';
+import ConfirmacaoRecuperacao from '../pages/ConfirmacaoRecuperacao';
+import RedefinirSenha from '../pages/RedefinirSenha';
 import Reservations from '../pages/Reservations';
 import Restaurants from '../pages/Restaurants';
+import RestauranteDetalhes from '../pages/RestauranteDetalhes';
+import Reserva from '../pages/Reserva';
 import Profile from '../pages/Profile';
+import StaffDashboard from '../pages/Staff/Dashboard';
+import OwnerDashboard from '../pages/Owner/Dashboard';
+import RestaurantProfile from '../pages/Owner/Restaurant';
+import AdminDashboard from '../pages/Admin/Dashboard';
 
 /**
  * Configuração de rotas da aplicação
@@ -26,6 +35,18 @@ export const router = createBrowserRouter([
     element: <Register />,
   },
   {
+    path: '/recuperar-senha',
+    element: <RecuperarSenha />,
+  },
+  {
+    path: '/confirmacao-recuperacao',
+    element: <ConfirmacaoRecuperacao />,
+  },
+  {
+    path: '/redefinir-senha',
+    element: <RedefinirSenha />,
+  },
+  {
     path: '/reservations',
     element: (
       <ProtectedRoute>
@@ -38,10 +59,50 @@ export const router = createBrowserRouter([
     element: <Restaurants />,
   },
   {
+    path: '/restaurantes/:id',
+    element: <RestauranteDetalhes />,
+  },
+  {
+    path: '/reserva/:id',
+    element: <Reserva />,
+  },
+  {
     path: '/profile',
     element: (
       <ProtectedRoute>
         <Profile />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/staff/dashboard',
+    element: (
+      <ProtectedRoute requiredRoles={['funcionario']}>
+        <StaffDashboard />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/owner/dashboard',
+    element: (
+      <ProtectedRoute requiredRoles={['admin_secundario']}>
+        <OwnerDashboard />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/owner/restaurant',
+    element: (
+      <ProtectedRoute requiredRoles={['admin_secundario']}>
+        <RestaurantProfile />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/admin/dashboard',
+    element: (
+      <ProtectedRoute requiredRoles={['admin_sistema']}>
+        <AdminDashboard />
       </ProtectedRoute>
     ),
   },

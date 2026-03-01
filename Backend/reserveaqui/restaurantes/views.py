@@ -1,7 +1,7 @@
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import Restaurante, RestauranteUsuario
 from .serializers import (
@@ -20,16 +20,16 @@ class RestauranteViewSet(viewsets.ModelViewSet):
     """
     ViewSet para gerenciar restaurantes.
     
-    list: Listar todos os restaurantes ativos
-    retrieve: Detalhes de um restaurante específico
-    create: Cadastrar novo restaurante (apenas admin)
-    update: Atualizar restaurante (proprietário ou admin)
-    partial_update: Atualizar parcialmente restaurante (proprietário ou admin)
-    destroy: Remover restaurante (apenas admin)
+    list: Listar todos os restaurantes ativos (público)
+    retrieve: Detalhes de um restaurante específico (público)
+    create: Cadastrar novo restaurante (apenas admin autenticado)
+    update: Atualizar restaurante (proprietário ou admin autenticado)
+    partial_update: Atualizar parcialmente restaurante (proprietário ou admin autenticado)
+    destroy: Remover restaurante (apenas admin autenticado)
     """
     
     queryset = Restaurante.objects.select_related('proprietario').prefetch_related('mesas').all()
-    permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
+    permission_classes = [AllowAny]  # Permitir acesso público, será validado em get_permissions()
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['cidade', 'estado', 'ativo']
     search_fields = ['nome', 'cidade', 'endereco']
@@ -45,12 +45,21 @@ class RestauranteViewSet(viewsets.ModelViewSet):
         return RestauranteSerializer
     
     def get_permissions(self):
-        """Define permissões específicas por ação"""
-        if self.action in ['update', 'partial_update']:
+        """
+        Define permissões específicas por ação:
+        - list, retrieve: Públicas (permite visualização sem autenticação)
+        - create: Requer autenticação + permissão
+        - update, partial_update: Requer proprietário ou admin
+        - destroy: Requer admin_sistema
+        """
+        if self.action == 'create':
+            return [IsAuthenticated(), IsAdminOrReadOnly()]
+        elif self.action in ['update', 'partial_update']:
             return [IsAuthenticated(), IsProprietarioOrAdmin()]
         elif self.action == 'destroy':
-            # Apenas admin_sistema pode deletar restaurante (não admin_secundario)
+            # Apenas admin_sistema pode deletar restaurante
             return [IsAuthenticated(), IsAdminSystemOnly()]
+        # list e retrieve são públicas (AllowAny)
         return super().get_permissions()
     
     def get_queryset(self):

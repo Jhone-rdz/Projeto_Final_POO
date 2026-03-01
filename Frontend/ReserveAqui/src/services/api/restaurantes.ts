@@ -1,5 +1,5 @@
 import api from './config';
-import { Restaurante, CriarRestauranteDTO, PaginatedResponse } from '../../types';
+import type { Restaurante, CriarRestauranteDTO, PaginatedResponse } from '../../types';
 
 /**
  * Serviços para gerenciamento de restaurantes
