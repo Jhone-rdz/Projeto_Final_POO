@@ -3,6 +3,7 @@ import { Button, Alert, Input } from '../../../components/common';
 import { useAuth } from '../../../context';
 import { useEffect, useState, useCallback } from 'react';
 import { restaurantesService, reservasService } from '../../../services/api';
+import { gerarImagemAleatoria } from '../../../utils/restaurantes';
 import type { Restaurante, CriarRestauranteDTO } from '../../../types';
 
 type TabType = 'restaurantes' | 'relatorios';
@@ -24,9 +25,14 @@ const AdminDashboard = () => {
   const [formRestaurante, setFormRestaurante] = useState<CriarRestauranteDTO>({
     nome: '',
     descricao: '',
-    localizacao: '',
-    horario_funcionamento: '',
-    imagem: '',
+    endereco: '',
+    cidade: '',
+    estado: '',
+    cep: '',
+    telefone: '',
+    email: '',
+    proprietario_email: '',
+    proprietario_nome: '',
     quantidade_mesas: 10,
   });
 
@@ -63,9 +69,17 @@ const AdminDashboard = () => {
   const carregarRestaurantes = useCallback(async () => {
     try {
       setCarregandoRestaurantes(true);
+      console.log('🔄 Carregando restaurantes...');
       const response = await restaurantesService.listar();
-      setRestaurantes(response.results || []);
-    } catch {
+      console.log('📋 Resposta do servidor:', response);
+      
+      // A resposta pode ser um array direto ou um objeto com results
+      const dados = Array.isArray(response) ? response : (response.results || []);
+      console.log('✅ Restaurantes carregados:', dados);
+      setRestaurantes(dados);
+      console.log(`✅ Total de ${dados.length} restaurantes encontrados`);
+    } catch (err) {
+      console.error('❌ Erro ao carregar restaurantes:', err);
       setErro('Erro ao carregar restaurantes');
     } finally {
       setCarregandoRestaurantes(false);
@@ -79,9 +93,12 @@ const AdminDashboard = () => {
       setFormRestaurante({
         nome: restaurante.nome,
         descricao: restaurante.descricao || '',
-        localizacao: restaurante.localizacao,
-        horario_funcionamento: restaurante.horario_funcionamento || '',
-        imagem: restaurante.imagem || '',
+        endereco: restaurante.endereco,
+        cidade: restaurante.cidade,
+        estado: restaurante.estado,
+        cep: restaurante.cep,
+        telefone: restaurante.telefone || '',
+        email: restaurante.email,
         quantidade_mesas: restaurante.quantidade_mesas || 10,
       });
     } else {
@@ -89,9 +106,14 @@ const AdminDashboard = () => {
       setFormRestaurante({
         nome: '',
         descricao: '',
-        localizacao: '',
-        horario_funcionamento: '',
-        imagem: '',
+        endereco: '',
+        cidade: '',
+        estado: '',
+        cep: '',
+        telefone: '',
+        email: '',
+        proprietario_email: '',
+        proprietario_nome: '',
         quantidade_mesas: 10,
       });
     }
@@ -103,34 +125,60 @@ const AdminDashboard = () => {
     setErro('');
     setSucesso('');
 
-    if (!formRestaurante.nome || !formRestaurante.localizacao) {
-      setErro('Nome e localização são obrigatórios');
+    // Validações básicas
+    const camposObrigatorios = ['nome', 'endereco', 'cidade', 'estado', 'cep', 'email'];
+    const camposFaltantes = camposObrigatorios.filter(
+      campo => !formRestaurante[campo as keyof CriarRestauranteDTO]
+    );
+
+    if (camposFaltantes.length > 0) {
+      setErro(`Campos obrigatórios faltando: ${camposFaltantes.join(', ')}`);
       return;
     }
 
-    if (formRestaurante.quantidade_mesas < 1) {
+    if (formRestaurante.quantidade_mesas && formRestaurante.quantidade_mesas < 1) {
       setErro('Quantidade de mesas deve ser pelo menos 1');
       return;
+    }
+
+    // Para novo restaurante, validar dados do proprietário
+    if (!restauranteEditando) {
+      if (!formRestaurante.proprietario_email || !formRestaurante.proprietario_nome) {
+        setErro('Email e nome do proprietário são obrigatórios para criar novo restaurante');
+        return;
+      }
     }
 
     try {
       setCarregandoAcao(true);
 
+      console.log('📤 Enviando dados:', JSON.stringify(formRestaurante, null, 2));
+
       if (restauranteEditando) {
-        // Editar
-        await restaurantesService.atualizar(restauranteEditando.id, formRestaurante);
+        // Editar - não enviar fields de proprietário
+        const dados = { ...formRestaurante };
+        delete dados.proprietario_email;
+        delete dados.proprietario_nome;
+        console.log('📝 Atualizando restaurante:', JSON.stringify(dados, null, 2));
+        await restaurantesService.atualizar(restauranteEditando.id, dados);
         setSucesso('Restaurante atualizado com sucesso!');
       } else {
         // Criar
-        await restaurantesService.criar(formRestaurante);
+        console.log('➕ Criando novo restaurante com:', JSON.stringify(formRestaurante, null, 2));
+        const resposta = await restaurantesService.criar(formRestaurante);
+        console.log('✅ Resposta do servidor:', JSON.stringify(resposta, null, 2));
         setSucesso('Restaurante cadastrado com sucesso!');
       }
 
       setModalRestaurante(false);
       carregarRestaurantes();
       setTimeout(() => setSucesso(''), 3000);
-    } catch {
-      setErro('Erro ao salvar restaurante');
+    } catch (err: any) {
+      console.error('❌ Erro ao salvar restaurante:', err);
+      const mensagem = err?.response?.data?.detail || 
+        Object.values(err?.response?.data || {})[0] || 
+        'Erro ao salvar restaurante';
+      setErro(String(mensagem));
     } finally {
       setCarregandoAcao(false);
     }
@@ -173,7 +221,7 @@ const AdminDashboard = () => {
 
       // Carregar todos os restaurantes para estatísticas
       const restaurantesResp = await restaurantesService.listar();
-      const todosRestaurantes = restaurantesResp.results || [];
+      const todosRestaurantes = Array.isArray(restaurantesResp) ? restaurantesResp : (restaurantesResp.results || []);
 
       // Carregar relatórios de cada restaurante
       const relatoriosPromises = todosRestaurantes.map(async (rest) => {
@@ -321,13 +369,9 @@ const AdminDashboard = () => {
                       {/* Imagem */}
                       <div className="flex-shrink-0">
                         <img
-                          src={rest.imagem || 'https://via.placeholder.com/120x120?text=Restaurante'}
+                          src={gerarImagemAleatoria()}
                           alt={rest.nome}
                           className="w-24 h-24 rounded-lg object-cover border border-gray-300"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src =
-                              'https://via.placeholder.com/120x120?text=Restaurante';
-                          }}
                         />
                       </div>
 
@@ -335,14 +379,17 @@ const AdminDashboard = () => {
                       <div className="flex-1">
                         <h3 className="font-bold text-xl text-gray-900 mb-2">{rest.nome}</h3>
                         <div className="space-y-1 text-sm text-gray-600">
-                          <p>📍 <strong>Localização:</strong> {rest.localizacao}</p>
+                          <p>📍 <strong>Endereço:</strong> {rest.endereco}</p>
+                          <p>🏙️ <strong>Cidade:</strong> {rest.cidade}, {rest.estado}</p>
                           {rest.descricao && (
                             <p>📝 <strong>Descrição:</strong> {rest.descricao}</p>
                           )}
-                          {rest.horario_funcionamento && (
-                            <p>🕐 <strong>Horário:</strong> {rest.horario_funcionamento}</p>
+                          <p>📧 <strong>Email:</strong> {rest.email}</p>
+                          {rest.telefone && (
+                            <p>📱 <strong>Telefone:</strong> {rest.telefone}</p>
                           )}
                           <p>🪑 <strong>Mesas:</strong> {rest.quantidade_mesas}</p>
+                          <p>✅ <strong>Status:</strong> {rest.ativo ? 'Ativo' : 'Inativo'}</p>
                         </div>
                       </div>
 
@@ -545,7 +592,7 @@ const AdminDashboard = () => {
       {/* MODAL: Cadastrar/Editar Restaurante */}
       {modalRestaurante && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-8 my-8">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-8 my-auto max-h-[calc(100vh-2rem)] overflow-y-auto">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">
               {restauranteEditando ? '✏️ Editar Restaurante' : '➕ Adicionar Restaurante'}
             </h2>
@@ -567,7 +614,7 @@ const AdminDashboard = () => {
                   Descrição
                 </label>
                 <textarea
-                  value={formRestaurante.descricao}
+                  value={formRestaurante.descricao || ''}
                   onChange={(e) =>
                     setFormRestaurante({ ...formRestaurante, descricao: e.target.value })
                   }
@@ -579,26 +626,70 @@ const AdminDashboard = () => {
 
               <div>
                 <Input
-                  label="Localização *"
-                  value={formRestaurante.localizacao}
+                  label="Endereço *"
+                  value={formRestaurante.endereco}
                   onChange={(e) =>
-                    setFormRestaurante({ ...formRestaurante, localizacao: e.target.value })
+                    setFormRestaurante({ ...formRestaurante, endereco: e.target.value })
                   }
-                  placeholder="Ex: Rua das Flores, 123, Centro"
+                  placeholder="Ex: Rua das Flores, 123"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Input
+                    label="Cidade *"
+                    value={formRestaurante.cidade}
+                    onChange={(e) =>
+                      setFormRestaurante({ ...formRestaurante, cidade: e.target.value })
+                    }
+                    placeholder="Ex: São Paulo"
+                  />
+                </div>
+                <div>
+                  <Input
+                    label="Estado *"
+                    value={formRestaurante.estado}
+                    onChange={(e) =>
+                      setFormRestaurante({ ...formRestaurante, estado: e.target.value })
+                    }
+                    placeholder="Ex: SP"
+                    maxLength={2}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Input
+                  label="CEP *"
+                  value={formRestaurante.cep}
+                  onChange={(e) =>
+                    setFormRestaurante({ ...formRestaurante, cep: e.target.value })
+                  }
+                  placeholder="Ex: 01310-100"
                 />
               </div>
 
               <div>
                 <Input
-                  label="Horário de Funcionamento"
-                  value={formRestaurante.horario_funcionamento}
+                  label="Email *"
+                  type="email"
+                  value={formRestaurante.email}
                   onChange={(e) =>
-                    setFormRestaurante({
-                      ...formRestaurante,
-                      horario_funcionamento: e.target.value,
-                    })
+                    setFormRestaurante({ ...formRestaurante, email: e.target.value })
                   }
-                  placeholder="Ex: Seg-Sex: 11h-23h, Sáb-Dom: 12h-00h"
+                  placeholder="Ex: contato@restaurante.com.br"
+                />
+              </div>
+
+              <div>
+                <Input
+                  label="Telefone"
+                  value={formRestaurante.telefone || ''}
+                  onChange={(e) =>
+                    setFormRestaurante({ ...formRestaurante, telefone: e.target.value })
+                  }
+                  placeholder="Ex: (11) 3123-4567"
                 />
               </div>
 
@@ -606,11 +697,11 @@ const AdminDashboard = () => {
                 <Input
                   type="number"
                   label="Quantidade de Mesas *"
-                  value={formRestaurante.quantidade_mesas.toString()}
+                  value={formRestaurante.quantidade_mesas?.toString() || '10'}
                   onChange={(e) =>
                     setFormRestaurante({
                       ...formRestaurante,
-                      quantidade_mesas: parseInt(e.target.value) || 0,
+                      quantidade_mesas: parseInt(e.target.value) || 10,
                     })
                   }
                   min="1"
@@ -618,30 +709,48 @@ const AdminDashboard = () => {
                 />
               </div>
 
-              <div>
-                <Input
-                  label="URL da Imagem"
-                  value={formRestaurante.imagem}
-                  onChange={(e) =>
-                    setFormRestaurante({ ...formRestaurante, imagem: e.target.value })
-                  }
-                  placeholder="https://exemplo.com/imagem.jpg"
-                />
-                {formRestaurante.imagem && (
-                  <div className="mt-4">
-                    <p className="text-sm text-gray-600 mb-2">Preview:</p>
-                    <img
-                      src={formRestaurante.imagem}
-                      alt="Preview"
-                      className="w-full max-w-md h-48 object-cover rounded-lg border border-gray-300"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src =
-                          'https://via.placeholder.com/400x200?text=Imagem+Indisponível';
-                      }}
+              {/* Campos do proprietário - apenas para criar novo restaurante */}
+              {!restauranteEditando && (
+                <>
+                  <div className="border-t-2 border-gray-200 pt-4 mt-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                      Informações do Proprietário (Admin Secundário) *
+                    </h3>
+                  </div>
+
+                  <div>
+                    <Input
+                      label="Nome do Proprietário *"
+                      value={formRestaurante.proprietario_nome || ''}
+                      onChange={(e) =>
+                        setFormRestaurante({
+                          ...formRestaurante,
+                          proprietario_nome: e.target.value,
+                        })
+                      }
+                      placeholder="Ex: João Silva"
                     />
                   </div>
-                )}
-              </div>
+
+                  <div>
+                    <Input
+                      label="Email do Proprietário *"
+                      type="email"
+                      value={formRestaurante.proprietario_email || ''}
+                      onChange={(e) =>
+                        setFormRestaurante({
+                          ...formRestaurante,
+                          proprietario_email: e.target.value,
+                        })
+                      }
+                      placeholder="Ex: joao@email.com"
+                    />
+                    <p className="text-xs text-gray-500 mt-2">
+                      💡 Uma senha genérica será gerada automaticamente e enviada para este email.
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="flex gap-3">

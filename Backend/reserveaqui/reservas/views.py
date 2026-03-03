@@ -55,7 +55,7 @@ class ReservaViewSet(viewsets.ModelViewSet):
         
         # Verificar se é admin
         is_admin = user.usuariopapel_set.filter(
-            papel__nome__in=['admin_sistema', 'admin_secundario']
+            papel__tipo__in=['admin_sistema', 'admin_secundario']
         ).exists()
         
         if is_admin:
@@ -109,7 +109,7 @@ class ReservaViewSet(viewsets.ModelViewSet):
         """
         # Apenas admin_sistema
         is_admin_sistema = request.user.usuariopapel_set.filter(
-            papel__nome='admin_sistema'
+            papel__tipo='admin_sistema'
         ).exists()
         
         if not is_admin_sistema:
@@ -139,7 +139,7 @@ class ReservaViewSet(viewsets.ModelViewSet):
         
         # 🔒 Validar permissão
         is_admin_sistema = user.usuariopapel_set.filter(
-            papel__nome='admin_sistema'
+            papel__tipo='admin_sistema'
         ).exists()
         
         if not is_admin_sistema:
@@ -147,7 +147,7 @@ class ReservaViewSet(viewsets.ModelViewSet):
             if user != reserva.restaurante.proprietario:
                 # Funcionário: deve trabalhar naquele restaurante
                 is_funcionario = user.usuariopapel_set.filter(
-                    papel__nome='funcionario'
+                    papel__tipo='funcionario'
                 ).exists()
                 
                 if is_funcionario:
@@ -155,7 +155,7 @@ class ReservaViewSet(viewsets.ModelViewSet):
                     trabalha_aqui = RestauranteUsuario.objects.filter(
                         usuario=user,
                         restaurante=reserva.restaurante,
-                        papel__nome='funcionario'
+                        papel='funcionario'
                     ).exists()
                     
                     if not trabalha_aqui:
@@ -223,7 +223,7 @@ class ReservaViewSet(viewsets.ModelViewSet):
         # Validar permissão: dono OU admin OU funcionário do restaurante
         is_dono = reserva.usuario == user
         is_admin_sistema = user.usuariopapel_set.filter(
-            papel__nome='admin_sistema'
+            papel__tipo='admin_sistema'
         ).exists()
         
         if not (is_dono or is_admin_sistema):
@@ -231,7 +231,7 @@ class ReservaViewSet(viewsets.ModelViewSet):
             if user != reserva.restaurante.proprietario:
                 # Funcionário: deve trabalhar naquele restaurante
                 is_funcionario = user.usuariopapel_set.filter(
-                    papel__nome='funcionario'
+                    papel__tipo='funcionario'
                 ).exists()
                 
                 if is_funcionario:
@@ -239,7 +239,7 @@ class ReservaViewSet(viewsets.ModelViewSet):
                     trabalha_aqui = RestauranteUsuario.objects.filter(
                         usuario=user,
                         restaurante=reserva.restaurante,
-                        papel__nome='funcionario'
+                        papel='funcionario'
                     ).exists()
                     
                     if not trabalha_aqui:
@@ -296,7 +296,7 @@ class ReservaViewSet(viewsets.ModelViewSet):
         
         # 🔒 Validar permissão
         is_admin_sistema = user.usuariopapel_set.filter(
-            papel__nome='admin_sistema'
+            papel__tipo='admin_sistema'
         ).exists()
         
         if not is_admin_sistema:
@@ -304,7 +304,7 @@ class ReservaViewSet(viewsets.ModelViewSet):
             if user != reserva.restaurante.proprietario:
                 # Funcionário: deve trabalhar naquele restaurante
                 is_funcionario = user.usuariopapel_set.filter(
-                    papel__nome='funcionario'
+                    papel__tipo='funcionario'
                 ).exists()
                 
                 if is_funcionario:
@@ -312,7 +312,7 @@ class ReservaViewSet(viewsets.ModelViewSet):
                     trabalha_aqui = RestauranteUsuario.objects.filter(
                         usuario=user,
                         restaurante=reserva.restaurante,
-                        papel__nome='funcionario'
+                        papel='funcionario'
                     ).exists()
                     
                     if not trabalha_aqui:
@@ -370,7 +370,7 @@ class ReservaViewSet(viewsets.ModelViewSet):
         """
         # Verificar se é admin
         is_admin = request.user.usuariopapel_set.filter(
-            papel__nome__in=['admin_sistema', 'admin_secundario']
+            papel__tipo__in=['admin_sistema', 'admin_secundario']
         ).exists()
         
         if not is_admin:
@@ -405,7 +405,7 @@ class ReservaViewSet(viewsets.ModelViewSet):
         """
         # Verificar se é admin
         is_admin = request.user.usuariopapel_set.filter(
-            papel__nome__in=['admin_sistema', 'admin_secundario']
+            papel__tipo__in=['admin_sistema', 'admin_secundario']
         ).exists()
         
         if not is_admin:
@@ -471,7 +471,7 @@ class ReservaViewSet(viewsets.ModelViewSet):
         """
         # Verificar se é admin
         is_admin = request.user.usuariopapel_set.filter(
-            papel__nome__in=['admin_sistema', 'admin_secundario']
+            papel__tipo__in=['admin_sistema', 'admin_secundario']
         ).exists()
         
         if not is_admin:
@@ -539,7 +539,7 @@ class ReservaViewSet(viewsets.ModelViewSet):
         """
         # Verificar se é admin
         is_admin = request.user.usuariopapel_set.filter(
-            papel__nome__in=['admin_sistema', 'admin_secundario']
+            papel__tipo__in=['admin_sistema', 'admin_secundario']
         ).exists()
         
         if not is_admin:
@@ -628,6 +628,11 @@ class NotificacaoViewSet(viewsets.ReadOnlyModelViewSet):
             'message': 'Notificação marcada como lida.',
             'notificacao': serializer.data
         })
+
+    @action(detail=True, methods=['post'])
+    def marcar_lida(self, request, pk=None):
+        """Alias de compatibilidade para frontend: /notificacoes/{id}/marcar_lida/"""
+        return self.marcar_como_lida(request, pk)
     
     @action(detail=False, methods=['post'])
     def marcar_todas_como_lidas(self, request):
@@ -642,6 +647,17 @@ class NotificacaoViewSet(viewsets.ReadOnlyModelViewSet):
             'message': f'{count} notificação(ões) marcada(s) como lida(s).',
             'quantidade': count
         })
+
+    @action(detail=False, methods=['post'])
+    def marcar_todas_lidas(self, request):
+        """Alias de compatibilidade para frontend: /notificacoes/marcar_todas_lidas/"""
+        return self.marcar_todas_como_lidas(request)
+
+    @action(detail=False, methods=['get'])
+    def contar_nao_lidas(self, request):
+        """Retorna contagem de notificações não lidas para badge no frontend."""
+        count = self.get_queryset().filter(lido=False).count()
+        return Response({'count': count})
     
     @action(detail=False, methods=['get'])
     def nao_lidas(self, request):

@@ -99,7 +99,7 @@ class UsuarioViewSet(viewsets.ModelViewSet):
             reset_token = PasswordResetToken.gerar_token_recuperacao(usuario)
             
             # Construir link de recuperação
-            reset_link = f"{settings.FRONTEND_URL}/recuperacao.html?token={reset_token.token}&email={email}" if hasattr(settings, 'FRONTEND_URL') else f"Token: {reset_token.token}"
+            reset_link = f"{settings.FRONTEND_URL}/redefinir-senha?token={reset_token.token}&email={email}" if hasattr(settings, 'FRONTEND_URL') else f"Token: {reset_token.token}"
             
             # Tentar enviar email
             try:

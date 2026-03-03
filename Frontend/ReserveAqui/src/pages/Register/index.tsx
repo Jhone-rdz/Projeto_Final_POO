@@ -33,9 +33,8 @@ export default function Register() {
    * Verificar força da senha
    */
   const verificarForcaSenha = (senha: string): 'fraca' | 'media' | 'forte' => {
-    if (senha.length < 6) return 'fraca';
-    if (senha.length < 10) return 'media';
-    if (/[A-Z]/.test(senha) && /[0-9]/.test(senha)) return 'forte';
+    if (senha.length < 8) return 'fraca';
+    if (/[A-Z]/.test(senha) && /[0-9]/.test(senha) && senha.length >= 8) return 'forte';
     return 'media';
   };
 
@@ -80,8 +79,12 @@ export default function Register() {
     // Senha
     if (!formData.senha) {
       newErrors.senha = 'Senha é obrigatória';
-    } else if (formData.senha.length < 6) {
-      newErrors.senha = 'Senha deve ter pelo menos 6 caracteres';
+    } else if (formData.senha.length < 8) {
+      newErrors.senha = 'Senha deve ter no mínimo 8 caracteres';
+    } else if (!/[A-Z]/.test(formData.senha)) {
+      newErrors.senha = 'Senha deve conter pelo menos 1 letra maiúscula';
+    } else if (!/[0-9]/.test(formData.senha)) {
+      newErrors.senha = 'Senha deve conter pelo menos 1 número';
     }
 
     // Confirmar Senha
@@ -111,10 +114,10 @@ export default function Register() {
 
     try {
       await cadastro({
-        username: formData.email.split('@')[0], // username derivado do email
         nome: formData.nome,
         email: formData.email,
         password: formData.senha,
+        password_confirm: formData.confirmarSenha,
       });
 
       setSuccessMessage('Cadastro realizado com sucesso! Redirecionando...');

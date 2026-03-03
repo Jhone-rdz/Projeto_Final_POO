@@ -14,6 +14,7 @@ class RestauranteSerializer(serializers.ModelSerializer):
             'id',
             'nome',
             'descricao',
+            'horario_funcionamento',
             'endereco',
             'cidade',
             'estado',
@@ -50,8 +51,12 @@ class RestauranteListSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'nome',
+            'descricao',
+            'horario_funcionamento',
+            'endereco',
             'cidade',
             'estado',
+            'cep',
             'telefone',
             'email',
             'proprietario_nome',
@@ -72,6 +77,7 @@ class RestauranteCreateUpdateSerializer(serializers.ModelSerializer):
         fields = [
             'nome',
             'descricao',
+            'horario_funcionamento',
             'endereco',
             'cidade',
             'estado',

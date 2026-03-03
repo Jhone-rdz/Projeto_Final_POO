@@ -41,7 +41,15 @@ Equipe ReserveAqui
             [usuario.email],
             fail_silently=False,
         )
+        print(f"\n[EMAIL] Email enviado com sucesso para {usuario.email}")
         return True
+    except ConnectionRefusedError as e:
+        print(f"\n[ERRO EMAIL] Conexão recusada ao tentar enviar email")
+        print(f"  - Verifique se o EMAIL_BACKEND está configurado corretamente")
+        print(f"  - Para desenvolvimento, use: EMAIL_BACKEND='django.core.mail.backends.console.EmailBackend'")
+        print(f"  - Detalhes do erro: {str(e)}")
+        return False
     except Exception as e:
-        print(f"Erro ao enviar email: {str(e)}")
+        print(f"\n[ERRO EMAIL] Erro ao enviar email: {str(e)}")
+        print(f"  - Tipo de erro: {type(e).__name__}")
         return False

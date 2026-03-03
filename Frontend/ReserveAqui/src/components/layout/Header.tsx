@@ -22,12 +22,22 @@ export const Header = () => {
 
   // Verificar se o usuário é cliente
   const isCliente = usuario?.papeis?.some(p => p.tipo === 'cliente');
+  const isFuncionario = usuario?.papeis?.some(p => p.tipo === 'funcionario');
+  const isProprietario = usuario?.papeis?.some(p => p.tipo === 'admin_secundario');
+  const isAdminSistema = usuario?.papeis?.some(p => p.tipo === 'admin_sistema');
+  const isPainelInterno = Boolean(isFuncionario || isProprietario || isAdminSistema);
+
+  const dashboardPath = isAdminSistema
+    ? '/admin/dashboard'
+    : isProprietario
+      ? '/owner/dashboard'
+      : isFuncionario
+        ? '/staff/dashboard'
+        : '/';
 
   // Não mostrar header nas páginas de autenticação
   const paginasAuthenticacao = ['/login', '/register', '/recuperar-senha', '/confirmacao-recuperacao', '/redefinir-senha'];
-  if (paginasAuthenticacao.includes(location.pathname)) {
-    return null;
-  }
+  const ocultarHeader = paginasAuthenticacao.includes(location.pathname);
 
   // Fechar dropdowns ao clicar fora
   useEffect(() => {
@@ -136,12 +146,16 @@ export const Header = () => {
     }
   };
 
+  if (ocultarHeader) {
+    return null;
+  }
+
   return (
     <header className="w-full bg-white shadow-sm sticky top-0 z-50">
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2">
+          <Link to={dashboardPath} className="flex items-center gap-2">
             <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold">
               R
             </div>
@@ -150,13 +164,17 @@ export const Header = () => {
 
           {/* Menu Desktop */}
           <nav className="hidden md:flex items-center gap-8">
-            <Link to="/" className="text-gray-600 hover:text-blue-600 font-medium">
-              Home
-            </Link>
-            <Link to="/restaurants" className="text-gray-600 hover:text-blue-600 font-medium">
-              Restaurantes
-            </Link>
-            {isAuthenticated && isCliente && (
+            {!isPainelInterno && (
+              <>
+                <Link to="/" className="text-gray-600 hover:text-blue-600 font-medium">
+                  Home
+                </Link>
+                <Link to="/restaurants" className="text-gray-600 hover:text-blue-600 font-medium">
+                  Restaurantes
+                </Link>
+              </>
+            )}
+            {isAuthenticated && isCliente && !isPainelInterno && (
               <Link to="/reservations" className="text-gray-600 hover:text-blue-600 font-medium">
                 Minhas Reservas
               </Link>
@@ -381,13 +399,17 @@ export const Header = () => {
         {/* Menu Mobile */}
         {menuAberto && (
           <div className="md:hidden py-4 border-t border-gray-200">
-            <Link to="/" className="block px-4 py-2 text-gray-600 hover:text-blue-600 font-medium">
-              Home
-            </Link>
-            <Link to="/restaurants" className="block px-4 py-2 text-gray-600 hover:text-blue-600 font-medium">
-              Restaurantes
-            </Link>
-            {isAuthenticated && isCliente && (
+            {!isPainelInterno && (
+              <>
+                <Link to="/" className="block px-4 py-2 text-gray-600 hover:text-blue-600 font-medium">
+                  Home
+                </Link>
+                <Link to="/restaurants" className="block px-4 py-2 text-gray-600 hover:text-blue-600 font-medium">
+                  Restaurantes
+                </Link>
+              </>
+            )}
+            {isAuthenticated && isCliente && !isPainelInterno && (
               <Link to="/reservations" className="block px-4 py-2 text-gray-600 hover:text-blue-600 font-medium">
                 Minhas Reservas
               </Link>

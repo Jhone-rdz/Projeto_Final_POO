@@ -13,7 +13,7 @@ class IsFuncionarioOrHigher(permissions.BasePermission):
         user = request.user
         
         # Admin_sistema pode fazer tudo
-        if user.usuariopapel_set.filter(papel__nome='admin_sistema').exists():
+        if user.usuariopapel_set.filter(papel__tipo='admin_sistema').exists():
             return True
         
         # Admin_secundario se for proprietário do restaurante
@@ -21,11 +21,11 @@ class IsFuncionarioOrHigher(permissions.BasePermission):
             return True
         
         # Funcionário: validar que trabalha naquele restaurante
-        if user.usuariopapel_set.filter(papel__nome='funcionario').exists():
+        if user.usuariopapel_set.filter(papel__tipo='funcionario').exists():
             return RestauranteUsuario.objects.filter(
                 usuario=user,
                 restaurante=obj.restaurante,
-                papel__nome='funcionario'
+                papel='funcionario'
             ).exists()
         
         return False
@@ -49,7 +49,7 @@ class IsAdminForWriteOrReadOnly(permissions.BasePermission):
         
         # Verifica se o usuário tem papel de admin (RN05)
         return request.user.usuariopapel_set.filter(
-            papel__nome__in=['admin_sistema', 'admin_secundario']
+            papel__tipo__in=['admin_sistema', 'admin_secundario']
         ).exists()
 
 
@@ -75,5 +75,5 @@ class IsAdminOrProprietarioRestaurante(permissions.BasePermission):
         
         # Administrador do sistema
         return request.user.usuariopapel_set.filter(
-            papel__nome__in=['admin_sistema', 'admin_secundario']
+            papel__tipo__in=['admin_sistema', 'admin_secundario']
         ).exists()

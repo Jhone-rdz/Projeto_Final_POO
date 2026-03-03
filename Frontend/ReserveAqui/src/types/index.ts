@@ -34,6 +34,7 @@ export interface Restaurante {
   id: number;
   nome: string;
   descricao: string;
+  horario_funcionamento?: string;
   endereco: string;
   cidade: string;
   estado: string;
@@ -41,6 +42,7 @@ export interface Restaurante {
   telefone: string;
   email: string;
   proprietario: number; // ID do usuário proprietário
+  proprietario_nome?: string; // Nome do proprietário (readonly)
   quantidade_mesas: number;
   ativo: boolean;
   data_criacao: string;
@@ -92,21 +94,24 @@ export interface Reserva {
 // ========================================
 
 export interface CriarUsuarioDTO {
-  username: string;
   nome: string;
   email: string;
   password: string;
+  password_confirm: string;
 }
 
 export interface CriarRestauranteDTO {
   nome: string;
   descricao?: string;
+  horario_funcionamento?: string;
   endereco: string;
   cidade: string;
   estado: string;
   cep: string;
   telefone?: string;
   email: string;
+  proprietario_email?: string; // Para criar novo proprietário
+  proprietario_nome?: string; // Para criar novo proprietário
   quantidade_mesas?: number;
 }
 

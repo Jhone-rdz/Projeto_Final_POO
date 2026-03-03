@@ -13,7 +13,7 @@ class IsAdminSystemOnly(permissions.BasePermission):
         
         # Apenas admin_sistema (não admin_secundario)
         return request.user.usuariopapel_set.filter(
-            papel__nome='admin_sistema'
+            papel__tipo='admin_sistema'
         ).exists()
 
 
@@ -35,7 +35,7 @@ class IsAdminOrReadOnly(permissions.BasePermission):
         
         # Verifica se o usuário tem papel de admin
         return request.user.usuariopapel_set.filter(
-            papel__nome__in=['admin_sistema', 'admin_secundario']
+            papel__tipo__in=['admin_sistema', 'admin_secundario']
         ).exists()
 
 
@@ -61,5 +61,5 @@ class IsProprietarioOrAdmin(permissions.BasePermission):
         
         # Administrador do sistema
         return request.user.usuariopapel_set.filter(
-            papel__nome__in=['admin_sistema', 'admin_secundario']
+            papel__tipo__in=['admin_sistema', 'admin_secundario']
         ).exists()

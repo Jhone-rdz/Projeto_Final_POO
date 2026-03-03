@@ -8,7 +8,7 @@ import { Input, Button, Alert } from '../../components/common';
  */
 export default function Login() {
   const navigate = useNavigate();
-  const { login, error: authError, clearError } = useAuth();
+  const { login, usuario, error: authError, clearError } = useAuth();
 
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
@@ -56,9 +56,15 @@ export default function Login() {
       await login(email, senha);
       setSuccessMessage('Login realizado com sucesso!');
       
-      // Redirecionar após sucesso
+      // Redirecionar com base no papel do usuário
       setTimeout(() => {
-        navigate('/');
+        if (usuario?.papeis?.some(p => p.tipo === 'admin_sistema')) {
+          navigate('/admin/dashboard');
+        } else if (usuario?.papeis?.some(p => p.tipo === 'admin_secundario')) {
+          navigate('/owner/dashboard');
+        } else {
+          navigate('/');
+        }
       }, 1000);
     } catch (err) {
       // Erro já está no authError do contexto

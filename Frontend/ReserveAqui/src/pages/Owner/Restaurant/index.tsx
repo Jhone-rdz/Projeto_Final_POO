@@ -11,6 +11,19 @@ import type { Restaurante, Usuario } from '../../../types';
 
 type TabType = 'info' | 'funcionarios' | 'relatorios';
 
+const extrairRestaurantes = (response: unknown): Restaurante[] => {
+  if (Array.isArray(response)) return response;
+  if (
+    response &&
+    typeof response === 'object' &&
+    'results' in response &&
+    Array.isArray((response as { results: Restaurante[] }).results)
+  ) {
+    return (response as { results: Restaurante[] }).results;
+  }
+  return [];
+};
+
 /**
  * Perfil do Restaurante - Gerenciamento completo
  */
@@ -31,9 +44,13 @@ const RestaurantProfile = () => {
   const [formRestaurante, setFormRestaurante] = useState({
     nome: '',
     descricao: '',
-    localizacao: '',
     horario_funcionamento: '',
-    imagem: '',
+    endereco: '',
+    cidade: '',
+    estado: '',
+    cep: '',
+    telefone: '',
+    email: '',
   });
 
   // Formulário de funcionário
@@ -87,15 +104,20 @@ const RestaurantProfile = () => {
     try {
       setCarregandoRestaurante(true);
       const response = await restaurantesService.meusRestaurantes();
-      if (response.results && response.results.length > 0) {
-        const rest = response.results[0];
+      const restaurantes = extrairRestaurantes(response);
+      if (restaurantes.length > 0) {
+        const rest = restaurantes[0];
         setRestaurante(rest);
         setFormRestaurante({
           nome: rest.nome || '',
           descricao: rest.descricao || '',
-          localizacao: rest.localizacao || '',
           horario_funcionamento: rest.horario_funcionamento || '',
-          imagem: rest.imagem || '',
+          endereco: rest.endereco || '',
+          cidade: rest.cidade || '',
+          estado: rest.estado || '',
+          cep: rest.cep || '',
+          telefone: rest.telefone || '',
+          email: rest.email || '',
         });
       }
     } catch {
@@ -112,8 +134,8 @@ const RestaurantProfile = () => {
 
     if (!restaurante) return;
 
-    if (!formRestaurante.nome || !formRestaurante.localizacao) {
-      setErro('Nome e localização são obrigatórios');
+    if (!formRestaurante.nome || !formRestaurante.endereco || !formRestaurante.cidade || !formRestaurante.estado) {
+      setErro('Nome, endereço, cidade e estado são obrigatórios');
       return;
     }
 
@@ -363,9 +385,13 @@ const RestaurantProfile = () => {
                           setFormRestaurante({
                             nome: restaurante.nome || '',
                             descricao: restaurante.descricao || '',
-                            localizacao: restaurante.localizacao || '',
                             horario_funcionamento: restaurante.horario_funcionamento || '',
-                            imagem: restaurante.imagem || '',
+                            endereco: restaurante.endereco || '',
+                            cidade: restaurante.cidade || '',
+                            estado: restaurante.estado || '',
+                            cep: restaurante.cep || '',
+                            telefone: restaurante.telefone || '',
+                            email: restaurante.email || '',
                           });
                         }}
                         disabled={carregandoAcao}
@@ -417,13 +443,59 @@ const RestaurantProfile = () => {
 
                   <div>
                     <Input
-                      label="Localização *"
-                      value={formRestaurante.localizacao}
+                      label="Localização (Endereço) *"
+                      value={formRestaurante.endereco}
                       onChange={(e) =>
-                        setFormRestaurante({ ...formRestaurante, localizacao: e.target.value })
+                        setFormRestaurante({ ...formRestaurante, endereco: e.target.value })
                       }
                       disabled={!editandoInfo}
                       placeholder="Ex: Rua das Flores, 123, Centro"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Input
+                      label="Cidade *"
+                      value={formRestaurante.cidade}
+                      onChange={(e) =>
+                        setFormRestaurante({ ...formRestaurante, cidade: e.target.value })
+                      }
+                      disabled={!editandoInfo}
+                    />
+                    <Input
+                      label="Estado *"
+                      value={formRestaurante.estado}
+                      onChange={(e) =>
+                        setFormRestaurante({ ...formRestaurante, estado: e.target.value })
+                      }
+                      disabled={!editandoInfo}
+                    />
+                    <Input
+                      label="CEP"
+                      value={formRestaurante.cep}
+                      onChange={(e) =>
+                        setFormRestaurante({ ...formRestaurante, cep: e.target.value })
+                      }
+                      disabled={!editandoInfo}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input
+                      label="Telefone"
+                      value={formRestaurante.telefone}
+                      onChange={(e) =>
+                        setFormRestaurante({ ...formRestaurante, telefone: e.target.value })
+                      }
+                      disabled={!editandoInfo}
+                    />
+                    <Input
+                      label="Email"
+                      value={formRestaurante.email}
+                      onChange={(e) =>
+                        setFormRestaurante({ ...formRestaurante, email: e.target.value })
+                      }
+                      disabled={!editandoInfo}
                     />
                   </div>
 
@@ -438,34 +510,8 @@ const RestaurantProfile = () => {
                         })
                       }
                       disabled={!editandoInfo}
-                      placeholder="Ex: Seg-Sex: 11h-23h, Sáb-Dom: 12h-00h"
+                      placeholder="Ex: Seg-Sex 11h-23h | Sáb-Dom 12h-00h"
                     />
-                  </div>
-
-                  <div>
-                    <Input
-                      label="URL da Imagem"
-                      value={formRestaurante.imagem}
-                      onChange={(e) =>
-                        setFormRestaurante({ ...formRestaurante, imagem: e.target.value })
-                      }
-                      disabled={!editandoInfo}
-                      placeholder="https://exemplo.com/imagem.jpg"
-                    />
-                    {formRestaurante.imagem && (
-                      <div className="mt-4">
-                        <p className="text-sm text-gray-600 mb-2">Preview:</p>
-                        <img
-                          src={formRestaurante.imagem}
-                          alt="Preview"
-                          className="w-full max-w-md h-48 object-cover rounded-lg border border-gray-300"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src =
-                              'https://via.placeholder.com/400x200?text=Imagem+Indisponível';
-                          }}
-                        />
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>

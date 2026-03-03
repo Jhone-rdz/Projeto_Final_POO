@@ -3,6 +3,24 @@ import type { ReactNode } from 'react';
 import type { Usuario, LoginResponse } from '../types';
 import { authService } from '../services/api';
 
+const extrairMensagemErro = (err: any, fallback: string): string => {
+  const data = err?.response?.data;
+
+  if (!data) return fallback;
+  if (typeof data === 'string') return data;
+  if (data.detail) return data.detail;
+
+  const primeiroCampo = Object.values(data)[0];
+  if (Array.isArray(primeiroCampo) && primeiroCampo.length > 0) {
+    return String(primeiroCampo[0]);
+  }
+  if (typeof primeiroCampo === 'string') {
+    return primeiroCampo;
+  }
+
+  return fallback;
+};
+
 /**
  * Interface do contexto de autenticação
  */
@@ -16,10 +34,10 @@ export interface AuthContextType {
   // Métodos
   login: (email: string, senha: string) => Promise<void>;
   cadastro: (userData: {
-    username: string;
     nome: string;
     email: string;
     password: string;
+    password_confirm: string;
   }) => Promise<void>;
   logout: () => void;
   trocarSenha: (senhaAtual: string, novaSenha: string) => Promise<void>;
@@ -84,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUsuario(response.usuario);
       setError(null);
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Erro ao fazer login';
+      const errorMessage = extrairMensagemErro(err, 'Erro ao fazer login');
       setError(errorMessage);
       setUsuario(null);
       throw err;
@@ -97,10 +115,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * Cadastrar novo usuário
    */
   const cadastro = async (userData: {
-    username: string;
     nome: string;
     email: string;
     password: string;
+    password_confirm: string;
   }) => {
     setIsLoading(true);
     setError(null);
@@ -111,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Fazer login automático após cadastro
       await login(userData.email, userData.password);
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Erro ao criar conta';
+      const errorMessage = extrairMensagemErro(err, 'Erro ao criar conta');
       setError(errorMessage);
       throw err;
     } finally {
@@ -138,7 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await authService.trocarSenha(senhaAtual, novaSenha);
       setError(null);
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Erro ao trocar senha';
+      const errorMessage = extrairMensagemErro(err, 'Erro ao trocar senha');
       setError(errorMessage);
       throw err;
     }
@@ -154,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await authService.solicitarRecuperacao(email);
       setError(null);
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Erro ao solicitar recuperação';
+      const errorMessage = extrairMensagemErro(err, 'Erro ao solicitar recuperação');
       setError(errorMessage);
       throw err;
     }
@@ -170,7 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await authService.redefinirSenha(token, novaSenha);
       setError(null);
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Erro ao redefinir senha';
+      const errorMessage = extrairMensagemErro(err, 'Erro ao redefinir senha');
       setError(errorMessage);
       throw err;
     }

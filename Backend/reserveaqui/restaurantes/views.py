@@ -77,7 +77,7 @@ class RestauranteViewSet(viewsets.ModelViewSet):
         
         # Admin_sistema vê todos (incluindo inativos)
         is_admin_sistema = user.usuariopapel_set.filter(
-            papel__nome='admin_sistema'
+            papel__tipo='admin_sistema'
         ).exists()
         
         if is_admin_sistema:
@@ -85,7 +85,7 @@ class RestauranteViewSet(viewsets.ModelViewSet):
         
         # Admin_secundario vê apenas seu restaurante
         is_admin_secundario = user.usuariopapel_set.filter(
-            papel__nome='admin_secundario'
+            papel__tipo='admin_secundario'
         ).exists()
         
         if is_admin_secundario:
@@ -166,7 +166,7 @@ class RestauranteViewSet(viewsets.ModelViewSet):
         # Verifica se é proprietário ou admin
         if restaurante.proprietario != request.user:
             is_admin = request.user.usuariopapel_set.filter(
-                papel__nome__in=['admin_sistema', 'admin_secundario']
+                papel__tipo__in=['admin_sistema', 'admin_secundario']
             ).exists()
             if not is_admin:
                 return Response(
@@ -263,7 +263,7 @@ class RestauranteUsuarioViewSet(viewsets.ModelViewSet):
         
         # Admin vê tudo
         is_admin = user.usuariopapel_set.filter(
-            papel__nome__in=['admin_sistema', 'admin_secundario']
+            papel__tipo__in=['admin_sistema', 'admin_secundario']
         ).exists()
         
         if is_admin:
@@ -272,3 +272,26 @@ class RestauranteUsuarioViewSet(viewsets.ModelViewSet):
         # Proprietários veem seus restaurantes
         restaurantes_proprietario = Restaurante.objects.filter(proprietario=user)
         return queryset.filter(restaurante__in=restaurantes_proprietario)
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def meus_restaurantes(self, request):
+        """Retorna os restaurantes do usuário autenticado (se for proprietário)"""
+        user = request.user
+        
+        # Se for admin_sistema, retorna todos os restaurantes
+        is_admin_sistema = user.papeis.filter(tipo='admin_sistema').exists()
+        
+        if is_admin_sistema:
+            restaurantes = Restaurante.objects.all()
+        else:
+            # Se for admin_secundario, retorna seu restaurante (é o proprietário)
+            restaurantes = Restaurante.objects.filter(proprietario=user)
+        
+        # Usar RestauranteListSerializer para retornar dados formatados
+        from .serializers import RestauranteListSerializer
+        serializer = RestauranteListSerializer(restaurantes, many=True)
+        
+        return Response({
+            'results': serializer.data
+        }, status=status.HTTP_200_OK)
+

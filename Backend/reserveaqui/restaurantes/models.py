@@ -15,6 +15,12 @@ class Restaurante(models.Model):
     cep = models.CharField(max_length=10, verbose_name="CEP")
     telefone = models.CharField(max_length=20, blank=True, verbose_name="Telefone")
     email = models.EmailField(unique=True, verbose_name="Email")
+    horario_funcionamento = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        verbose_name="Horário de Funcionamento"
+    )
     
     # Proprietário/Gerente Principal
     proprietario = models.ForeignKey(

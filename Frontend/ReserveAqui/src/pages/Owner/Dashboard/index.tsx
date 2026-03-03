@@ -4,6 +4,33 @@ import { useAuth } from '../../../context';
 import { useEffect, useState, useCallback } from 'react';
 import { mesasService, reservasService, restaurantesService } from '../../../services/api';
 import type { Mesa, Reserva, Restaurante } from '../../../types';import { Link } from 'react-router-dom';
+
+const extrairRestaurantes = (response: unknown): Restaurante[] => {
+  if (Array.isArray(response)) return response;
+  if (
+    response &&
+    typeof response === 'object' &&
+    'results' in response &&
+    Array.isArray((response as { results: Restaurante[] }).results)
+  ) {
+    return (response as { results: Restaurante[] }).results;
+  }
+  return [];
+};
+
+const extrairLista = <T,>(response: unknown): T[] => {
+  if (Array.isArray(response)) return response;
+  if (
+    response &&
+    typeof response === 'object' &&
+    'results' in response &&
+    Array.isArray((response as { results: T[] }).results)
+  ) {
+    return (response as { results: T[] }).results;
+  }
+  return [];
+};
+
 /**
  * Dashboard do Proprietário - Gestão completa do restaurante
  */
@@ -60,9 +87,9 @@ const OwnerDashboard = () => {
     try {
       setCarregandoRestaurante(true);
       const response = await restaurantesService.meusRestaurantes();
-      if (response.results && response.results.length > 0) {
-        setRestaurante(response.results[0]);
-      }
+      const restaurantes = extrairRestaurantes(response);
+      if (restaurantes.length > 0) setRestaurante(restaurantes[0]);
+      else setRestaurante(null);
     } catch {
       setErro('Erro ao carregar informações do restaurante');
     } finally {
@@ -75,10 +102,13 @@ const OwnerDashboard = () => {
     try {
       setCarregandoMesas(true);
       const response = await restaurantesService.meusRestaurantes();
-      if (response.results && response.results.length > 0) {
-        const restauranteId = response.results[0].id;
+      const restaurantes = extrairRestaurantes(response);
+      if (restaurantes.length > 0) {
+        const restauranteId = restaurantes[0].id;
         const mesasResponse = await mesasService.listar({ restaurante: restauranteId });
-        setMesas(mesasResponse.results || []);
+        setMesas(extrairLista<Mesa>(mesasResponse));
+      } else {
+        setMesas([]);
       }
     } catch {
       setErro('Erro ao carregar mesas');
@@ -92,21 +122,24 @@ const OwnerDashboard = () => {
     try {
       setCarregandoReservas(true);
       const response = await restaurantesService.meusRestaurantes();
-      if (response.results && response.results.length > 0) {
-        const restauranteId = response.results[0].id;
+      const restaurantes = extrairRestaurantes(response);
+      if (restaurantes.length > 0) {
+        const restauranteId = restaurantes[0].id;
         
         let reservasResponse;
         if (filtroReservas === 'hoje') {
           reservasResponse = await reservasService.reservasHoje(restauranteId);
           setReservas(reservasResponse);
         } else {
-          const params: any = { restaurante: restauranteId };
+          const params: { restaurante: number; status?: string } = { restaurante: restauranteId };
           if (filtroReservas !== 'todas') {
             params.status = filtroReservas;
           }
           reservasResponse = await reservasService.listar(params);
-          setReservas(reservasResponse.results || []);
+          setReservas(extrairLista<Reserva>(reservasResponse));
         }
+      } else {
+        setReservas([]);
       }
     } catch {
       setErro('Erro ao carregar reservas');
@@ -148,8 +181,6 @@ const OwnerDashboard = () => {
       await mesasService.criar({
         restaurante: restaurante.id,
         numero: Number(numeroNovaMesa),
-        status: 'disponivel',
-        ativa: true,
       });
       setSucesso(`Mesa ${numeroNovaMesa} adicionada com sucesso!`);
       setModalAdicionarMesa(false);

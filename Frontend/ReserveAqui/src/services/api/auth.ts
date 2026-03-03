@@ -9,7 +9,7 @@ export const authService = {
    * Realizar login
    */
   async login(email: string, senha: string): Promise<LoginResponse> {
-    const response = await api.post('/usuarios/login/', { email, senha });
+    const response = await api.post('/usuarios/login/', { email, password: senha });
     return response.data;
   },
 
@@ -53,10 +53,12 @@ export const authService = {
    * Redefinir senha com token
    */
   async redefinirSenha(token: string, novaSenha: string): Promise<{ mensagem: string }> {
+    const email = new URLSearchParams(window.location.search).get('email');
     const response = await api.post('/usuarios/redefinir_senha/', {
       token,
+      email,
       nova_senha: novaSenha,
-      confirmacao_senha: novaSenha,
+      nova_senha_confirm: novaSenha,
     });
     return response.data;
   },

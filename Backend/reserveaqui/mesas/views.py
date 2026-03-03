@@ -56,21 +56,21 @@ class MesaViewSet(viewsets.ModelViewSet):
         
         if not user.is_authenticated:
             return queryset.none()
-        
+
         # Admin_sistema vê todas
         is_admin_sistema = user.usuariopapel_set.filter(
-            papel__nome='admin_sistema'
+            papel__tipo='admin_sistema'
         ).exists()
-        
+
         if is_admin_sistema:
             # Sem filtro restritivo - vê tudo
             pass
         else:
             # Admin_secundario: vê apenas seu restaurante (como proprietário)
             is_admin_secundario = user.usuariopapel_set.filter(
-                papel__nome='admin_secundario'
+                papel__tipo='admin_secundario'
             ).exists()
-            
+
             if is_admin_secundario:
                 # Apenas mesas do restaurante que é proprietário
                 from restaurantes.models import Restaurante
@@ -82,16 +82,16 @@ class MesaViewSet(viewsets.ModelViewSet):
             else:
                 # Funcionário: vê apenas do restaurante onde trabalha
                 is_funcionario = user.usuariopapel_set.filter(
-                    papel__nome='funcionario'
+                    papel__tipo='funcionario'
                 ).exists()
-                
+
                 if is_funcionario:
                     # Buscar restaurantes onde trabalha
                     restaurantes_ids = RestauranteUsuario.objects.filter(
                         usuario=user,
-                        papel__nome='funcionario'
+                        papel='funcionario'
                     ).values_list('restaurante_id', flat=True)
-                    
+
                     if restaurantes_ids:
                         queryset = queryset.filter(restaurante_id__in=restaurantes_ids)
                     else:
@@ -249,7 +249,7 @@ class MesaViewSet(viewsets.ModelViewSet):
         
         # Admin_sistema: tudo bem
         is_admin_sistema = user.usuariopapel_set.filter(
-            papel__nome='admin_sistema'
+            papel__tipo='admin_sistema'
         ).exists()
         
         if not is_admin_sistema:
@@ -259,17 +259,17 @@ class MesaViewSet(viewsets.ModelViewSet):
             else:
                 # Funcionário: deve trabalhar naquele restaurante
                 is_funcionario = user.usuariopapel_set.filter(
-                    papel__nome='funcionario'
+                    papel__tipo='funcionario'
                 ).exists()
-                
+
                 if is_funcionario:
                     # Validar que trabalha no restaurante
                     trabalha_aqui = RestauranteUsuario.objects.filter(
                         usuario=user,
                         restaurante=mesa.restaurante,
-                        papel__nome='funcionario'
+                        papel='funcionario'
                     ).exists()
-                    
+
                     if not trabalha_aqui:
                         return Response(
                             {"error": "Você não trabalha neste restaurante."},
@@ -298,7 +298,7 @@ class MesaViewSet(viewsets.ModelViewSet):
         """
         # Apenas admin_sistema
         is_admin_sistema = request.user.usuariopapel_set.filter(
-            papel__nome='admin_sistema'
+            papel__tipo='admin_sistema'
         ).exists()
         
         if not is_admin_sistema:

@@ -60,7 +60,7 @@ export const restaurantesService = {
   /**
    * Obter restaurantes do usuário autenticado (proprietário)
    */
-  async meusRestaurantes(): Promise<Restaurante[]> {
+  async meusRestaurantes(): Promise<PaginatedResponse<Restaurante> | Restaurante[]> {
     const response = await api.get('/restaurantes-usuarios/meus_restaurantes/');
     return response.data;
   },

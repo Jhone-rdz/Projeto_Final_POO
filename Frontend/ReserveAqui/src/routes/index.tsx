@@ -1,5 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom';
 import { ProtectedRoute } from './ProtectedRoute';
+import { PublicClienteRoute } from './PublicClienteRoute';
 
 // Pages
 import { Home } from '../pages/Home';
@@ -24,7 +25,11 @@ import AdminDashboard from '../pages/Admin/Dashboard';
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: <Home />,
+    element: (
+      <PublicClienteRoute>
+        <Home />
+      </PublicClienteRoute>
+    ),
   },
   {
     path: '/login',
@@ -49,22 +54,34 @@ export const router = createBrowserRouter([
   {
     path: '/reservations',
     element: (
-      <ProtectedRoute>
+      <ProtectedRoute requiredRoles={['cliente']}>
         <Reservations />
       </ProtectedRoute>
     ),
   },
   {
     path: '/restaurants',
-    element: <Restaurants />,
+    element: (
+      <PublicClienteRoute>
+        <Restaurants />
+      </PublicClienteRoute>
+    ),
   },
   {
     path: '/restaurantes/:id',
-    element: <RestauranteDetalhes />,
+    element: (
+      <PublicClienteRoute>
+        <RestauranteDetalhes />
+      </PublicClienteRoute>
+    ),
   },
   {
     path: '/reserva/:id',
-    element: <Reserva />,
+    element: (
+      <PublicClienteRoute>
+        <Reserva />
+      </PublicClienteRoute>
+    ),
   },
   {
     path: '/profile',

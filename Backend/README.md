@@ -313,3 +313,206 @@ Gerenciar:
 - Tokens de Recuperação de Senha
 
 ---
+
+# Tratamento de Erros
+🔐 Login
+ Email não fornecido → 400 Bad Request ("Email obrigatório")
+ Senha não fornecida → 400 Bad Request ("Senha obrigatória")
+ Email não encontrado no banco → 401 Unauthorized ("Credenciais inválidas")
+ Senha incorreta → 401 Unauthorized ("Credenciais inválidas")
+ Usuário inativo/bloqueado → 403 Forbidden ("Usuário inativo")
+ Erro ao buscar usuário no banco → 500 Internal Server Error + log
+ Gerar JWT corretamente
+ Refresh token (se implementar)
+📝 Cadastro
+ Nome não fornecido → 400 Bad Request ("Nome obrigatório")
+ Email não fornecido → 400 Bad Request ("Email obrigatório")
+ Email inválido (regex) → 400 Bad Request ("Email inválido")
+ Senha não fornecida → 400 Bad Request ("Senha obrigatória")
+ Senha fraca → 400 Bad Request ("Senha deve ter mín 8 caracteres...")
+ Email já existe → 409 Conflict ("Email já cadastrado")
+ Nome com caracteres inválidos → 400 Bad Request
+ Erro ao hash da senha → 500 Internal Server Error + log
+ Erro ao salvar no banco → 500 Internal Server Error + log
+ Erro ao enviar email de confirmação → log (não bloqueia cadastro)
+ Retornar usuario criado (sem senha)
+🔐 Recuperação de Senha
+ Email não fornecido → 400 Bad Request
+ Email não encontrado → 404 Not Found ("Email não encontrado")
+ Erro ao gerar token de reset → 500 Internal Server Error + log
+ Erro ao enviar email → 500 Internal Server Error + log
+ Token de reset expirado → 400 Bad Request ("Link expirado")
+ Token de reset inválido → 400 Bad Request ("Link inválido")
+ Nova senha não fornecida → 400 Bad Request
+ Nova senha fraca → 400 Bad Request
+ Erro ao atualizar senha no banco → 500 Internal Server Error + log
+🔑 Trocar Senha (Logado)
+ Usuário não autenticado → 401 Unauthorized
+ Token inválido/expirado → 401 Unauthorized
+ Senha atual não fornecida → 400 Bad Request
+ Nova senha não fornecida → 400 Bad Request
+ Confirmação não fornecida → 400 Bad Request
+ Senha atual incorreta → 401 Unauthorized ("Senha atual incorreta")
+ Nova senha = senha atual → 400 Bad Request ("Mesma senha")
+ Nova senha fraca → 400 Bad Request
+ Confirmação ≠ nova senha → 400 Bad Request ("Senhas não conferem")
+ Erro ao atualizar banco → 500 Internal Server Error + log
+ Atualizar último change de senha
+👤 Editar Dados Pessoais
+ Usuário não autenticado → 401 Unauthorized
+ Token inválido → 401 Unauthorized
+ Nome vazio → 400 Bad Request ("Nome obrigatório")
+ Email vazio → 400 Bad Request ("Email obrigatório")
+ Email inválido (regex) → 400 Bad Request
+ Email já existe (outro usuário) → 409 Conflict ("Email já em uso")
+ Usuário não encontrado → 404 Not Found
+ Erro ao atualizar banco → 500 Internal Server Error + log
+ Não permitir editar senha/role aqui
+ Retornar usuário atualizado
+🏪 Listar Restaurantes
+ Nenhum filtro → retornar todos com paginação
+ Filtro por localização → validar valor
+ Sem resultados → retornar array vazio (não é erro)
+ Erro ao buscar banco → 500 Internal Server Error + log
+ Dados incompletos (NULL) → retornar NULL ou valor padrão
+ Limite de paginação excedido → 400 Bad Request
+ Página inválida → 400 Bad Request
+🍽️ Detalhe do Restaurante
+ ID não fornecido → 400 Bad Request
+ ID inválido (não é UUID) → 400 Bad Request
+ Restaurante não encontrado → 404 Not Found
+ Restaurante deletado logicamente → 404 Not Found
+ Erro ao buscar banco → 500 Internal Server Error + log
+ Retornar todas as informações (mesas, horários)
+🪑 Listar Mesas (com Disponibilidade)
+ Restaurant_id não fornecido → 400 Bad Request
+ Restaurant_id inválido → 400 Bad Request
+ Data não fornecida → 400 Bad Request
+ Data inválida (formato) → 400 Bad Request
+ Data no passado → 400 Bad Request ("Data deve ser futura")
+ Horário não fornecido → 400 Bad Request
+ Horário inválido (formato) → 400 Bad Request
+ Horário fora do funcionamento → 400 Bad Request ("Restaurante fechado")
+ Restaurante não encontrado → 404 Not Found
+ Erro ao buscar mesas → 500 Internal Server Error + log
+ Erro ao verificar reservas conflitantes → 500 Internal Server Error + log
+ Nenhuma mesa disponível → retornar array vazio
+ Retornar apenas mesas não deletadas
+ Retornar status de disponibilidade de cada mesa
+📅 Criar Reserva (RF05)
+ Usuário não autenticado → 401 Unauthorized
+ Token inválido → 401 Unauthorized
+ Restaurant_id não fornecido → 400 Bad Request
+ Restaurant_id inválido → 400 Bad Request
+ Table_id não fornecido → 400 Bad Request
+ Table_id inválido → 400 Bad Request
+ Data não fornecida → 400 Bad Request
+ Data inválida → 400 Bad Request
+ Data no passado → 400 Bad Request
+ Horário não fornecido → 400 Bad Request
+ Horário inválido → 400 Bad Request
+ Pessoas não fornecido → 400 Bad Request
+ Pessoas <= 0 ou inválido → 400 Bad Request
+ RN01: Mesa já reservada neste horário → 409 Conflict ("Mesa não disponível")
+ RN02: Pessoas > capacidade da mesa → 409 Conflict ("Muitas pessoas")
+ Restaurante não encontrado → 404 Not Found
+ Mesa não encontrada → 404 Not Found
+ Mesa deletada → 404 Not Found
+ Horário fora do funcionamento → 400 Bad Request
+ Erro ao salvar no banco → 500 Internal Server Error + log
+ RF07: Criar chamado interno → registrar em tabela de chamados
+ RF08: Enviar confirmação por email → log de envio
+ Erro ao enviar email → log (não bloqueia reserva)
+ Retornar reserva criada com ID e status
+📋 Listar Reservas do Cliente
+ Usuário não autenticado → 401 Unauthorized
+ Erro ao buscar banco → 500 Internal Server Error + log
+ Nenhuma reserva encontrada → retornar array vazio
+ Restaurante/mesa deletados → mostrar informações cache ou deletado
+ Incluir status de cada reserva
+ Ordenar por data descendente (mais recentes primeiro)
+ Filtro por status (confirmada, cancelada, atendida) → validar valor
+✏️ Editar Reserva (RF06)
+ Usuário não autenticado → 401 Unauthorized
+ Reservation_id não fornecido → 400 Bad Request
+ Reservation_id inválido → 400 Bad Request
+ Reserva não encontrada → 404 Not Found
+ Usuário não é dono da reserva → 403 Forbidden
+ Reserva já foi atendida → 409 Conflict ("Não pode editar")
+ Reserva já foi cancelada → 409 Conflict ("Não pode editar")
+ Nova data no passado → 400 Bad Request
+ Novo horário inválido → 400 Bad Request
+ Nova mesa não existe → 404 Not Found
+ RN01: Nova mesa já reservada → 409 Conflict
+ RN02: Pessoas > capacidade nova mesa → 409 Conflict
+ Nenhum campo alterado → 400 Bad Request ("Nenhuma alteração")
+ Pessoas não fornecido (mas quer editar) → manter existente
+ Erro ao atualizar banco → 500 Internal Server Error + log
+ Atualizar timestamp de modificação
+ Retornar reserva atualizada
+❌ Cancelar Reserva (RN03)
+ Usuário não autenticado → 401 Unauthorized
+ Reservation_id não fornecido → 400 Bad Request
+ Reservation_id inválido → 400 Bad Request
+ Reserva não encontrada → 404 Not Found
+ Usuário não é dono → 403 Forbidden
+ Reserva já foi cancelada → 409 Conflict ("Já está cancelada")
+ Reserva já foi atendida → 409 Conflict ("Já foi atendida")
+ Prazo de cancelamento expirado (se implementar) → 409 Conflict
+ Erro ao atualizar status → 500 Internal Server Error + log
+ RN03: Liberar mesa (atualizar disponibilidade)
+ Enviar notificação de cancelamento → log
+ Erro ao enviar notificação → log (não bloqueia cancelamento)
+ Atualizar timestamp de cancelamento
+ Retornar reserva cancelada
+🔔 Notificações
+ Usuário não autenticado → 401 Unauthorized
+ Listar notificações do usuário → array vazio se nenhuma
+ Erro ao buscar banco → 500 Internal Server Error + log
+ Marcar como lida → validar notificação existe
+ Notification_id inválido → 404 Not Found
+ Usuário não é destinatário → 403 Forbidden
+ Erro ao atualizar → 500 Internal Server Error + log
+ Deletar notificação → similar
+ Retornar notificações ordenadas por data (mais recentes primeiro)
+🔐 Autenticação (Middleware)
+ Header Authorization ausente → 401 Unauthorized
+ Formato do header inválido (não é "Bearer <token>") → 401 Unauthorized
+ Token inválido (não JWT válido) → 401 Unauthorized
+ Token expirado → 401 Unauthorized ("Token expirado")
+ Payload do token corrompido → 401 Unauthorized
+ Secret key errado → log de erro (não deveria acontecer)
+ Retornar usuário decodificado no req.user
+🔒 Autorização (Por rota)
+ Usuário sem role de admin em rota admin → 403 Forbidden
+ Usuário tentando acessar recurso de outro → 403 Forbidden
+ Log de tentativas de acesso não autorizado
+⚙️ Validação de Entrada (Global)
+ SQL Injection → sanitizar inputs, usar prepared statements
+ XSS → escapar/validar strings antes de retornar
+ Campos extra na requisição → ignorar (não erro)
+ Tipo de dado errado (string em lugar de número) → 400 Bad Request
+ Valores fora do intervalo permitido → 400 Bad Request
+ Strings muito longas → truncar ou rejeitar (configurável)
+ Caracteres especiais não permitidos → 400 Bad Request
+💾 Banco de Dados
+ Violação de constraint (email único) → 409 Conflict
+ Foreign key inválida → 400 Bad Request ou 404 Not Found
+ Deadlock → retry automático (máx 3 tentativas)
+ Conexão perdida → 500 Internal Server Error (reconectar)
+ Timeout de query → 500 Internal Server Error + log
+ Espaço em disco cheio → 500 Internal Server Error + alerta
+ Transação falhou → rollback automático + log
+🌐 Rede e Performance
+ Rate limiting → 429 Too Many Requests (máx 100 req/min por IP)
+ Request muito grande → 413 Payload Too Large
+ Headers ausentes obrigatórios → 400 Bad Request
+ CORS mal configurado → 403 Forbidden
+ Log de todas as requisições (info)
+ Log de todos os erros (error)
+ Tempo de resposta muito alto → log (warning)
+📝 Erros Internos com Log
+ Todos os 500 → log com stack trace + ID de erro
+ Retry automático para operações críticas
+ Alerta ao team se muitos erros em curto período
+ Monitoramento de métricas (uptimes, latência)

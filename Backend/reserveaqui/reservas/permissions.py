@@ -20,7 +20,7 @@ class IsOwnerOrAdminForReservas(permissions.BasePermission):
         """
         # Verificar se é admin
         is_admin = request.user.usuariopapel_set.filter(
-            papel__nome__in=['admin_sistema', 'admin_secundario']
+            papel__tipo__in=['admin_sistema', 'admin_secundario']
         ).exists()
         
         if is_admin:
@@ -50,5 +50,5 @@ class IsAdminOrReadAuthenticated(permissions.BasePermission):
         
         # Escrita apenas para admins
         return request.user.usuariopapel_set.filter(
-            papel__nome__in=['admin_sistema', 'admin_secundario']
+            papel__tipo__in=['admin_sistema', 'admin_secundario']
         ).exists()

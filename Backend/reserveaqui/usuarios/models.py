@@ -64,8 +64,8 @@ class Usuario(AbstractUser):
     
     @staticmethod
     def gerar_senha_generica():
-        """Gera uma senha genérica segura de 12 caracteres"""
-        caracteres = string.ascii_letters + string.digits + "!@#$%&*"
+        """Gera uma senha genérica segura de 12 caracteres (apenas letras e números)"""
+        caracteres = string.ascii_letters + string.digits
         senha = ''.join(secrets.choice(caracteres) for _ in range(12))
         return senha
 
