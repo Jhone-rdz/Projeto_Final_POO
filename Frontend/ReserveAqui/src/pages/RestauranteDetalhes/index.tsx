@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Header, Footer } from '../../components/layout';
-import { Button, Alert } from '../../components/common';
+import { Button } from '../../components/common';
 import { restaurantesService, mesasService } from '../../services/api';
 import type { Restaurante, Mesa } from '../../types';
 import { useAuth } from '../../context';
@@ -34,11 +34,18 @@ const RestauranteDetalhes = () => {
       const restauranteData = await restaurantesService.obter(Number(id));
       setRestaurante(restauranteData);
 
-      // Carregar mesas
-      const mesasResponse = await mesasService.listar({
-        restaurante: Number(id),
-      });
-      setMesas(mesasResponse.results || []);
+      // Carregar mesas apenas para usuário autenticado
+      if (isAuthenticated) {
+        const mesasResponse = await mesasService.listar({
+          restaurante: Number(id),
+        });
+        const listaMesas = Array.isArray(mesasResponse)
+          ? mesasResponse
+          : (mesasResponse.results || []);
+        setMesas(listaMesas);
+      } else {
+        setMesas([]);
+      }
     } catch (error) {
       console.error('Erro ao carregar detalhes:', error);
       setErro('Não foi possível carregar os detalhes do restaurante. Tente novamente mais tarde.');
@@ -48,6 +55,9 @@ const RestauranteDetalhes = () => {
   };
 
   const contarMesasDisponiveis = () => {
+    if (!isAuthenticated && restaurante) {
+      return restaurante.quantidade_mesas || 0;
+    }
     return mesas.filter((mesa) => mesa.status === 'disponivel').length;
   };
 
@@ -122,7 +132,7 @@ const RestauranteDetalhes = () => {
   }
 
   const mesasDisponiveis = contarMesasDisponiveis();
-  const totalMesas = mesas.length;
+  const totalMesas = isAuthenticated ? mesas.length : (restaurante.quantidade_mesas || 0);
 
   return (
     <div className="w-full flex flex-col min-h-screen bg-gray-50">

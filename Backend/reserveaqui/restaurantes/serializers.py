@@ -45,6 +45,13 @@ class RestauranteListSerializer(serializers.ModelSerializer):
     """Serializer simplificado para listagem de restaurantes"""
     
     proprietario_nome = serializers.CharField(source='proprietario.nome', read_only=True)
+    mesas_disponiveis = serializers.SerializerMethodField()
+
+    def get_mesas_disponiveis(self, obj):
+        mesas = list(obj.mesas.all())
+        if not mesas:
+            return obj.quantidade_mesas
+        return sum(1 for mesa in mesas if mesa.ativa and mesa.status == 'disponivel')
     
     class Meta:
         model = Restaurante
@@ -60,6 +67,7 @@ class RestauranteListSerializer(serializers.ModelSerializer):
             'telefone',
             'email',
             'proprietario_nome',
+            'mesas_disponiveis',
             'quantidade_mesas',
             'ativo'
         ]

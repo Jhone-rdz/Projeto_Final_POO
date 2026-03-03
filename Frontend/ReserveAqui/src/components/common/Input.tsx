@@ -1,5 +1,7 @@
 import React from 'react';
 
+const GOLD = '#C9922A';
+
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
@@ -7,33 +9,59 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 
 /**
- * Componente de Input reutilizável
+ * Componente de Input reutilizável — tema ReservaFácil
  */
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, helperText, className, ...props }, ref) => {
+  ({ label, error, helperText, className = '', style, ...props }, ref) => {
     return (
       <div className="w-full">
         {label && (
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label
+            style={{
+              display: 'block',
+              color: GOLD,
+              fontWeight: 700,
+              fontSize: '1rem',
+              marginBottom: 8,
+              fontFamily: "'Georgia', serif",
+            }}
+          >
             {label}
           </label>
         )}
         <input
           ref={ref}
-          className={`
-            w-full px-4 py-2 border rounded-lg
-            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-            transition-all duration-200
-            ${error ? 'border-red-500' : 'border-gray-300'}
-            ${className}
-          `}
+          style={{
+            width: '100%',
+            backgroundColor: '#2e2b27',
+            border: error ? '1.5px solid #e05555' : '1.5px solid #5a5248',
+            borderRadius: 8,
+            padding: '12px 16px',
+            color: '#fff',
+            fontSize: '0.95rem',
+            outline: 'none',
+            boxSizing: 'border-box',
+            transition: 'border-color 0.2s',
+            ...style,
+          }}
+          className={className}
+          onFocus={e => {
+            if (!error) (e.currentTarget as HTMLInputElement).style.borderColor = GOLD;
+          }}
+          onBlur={e => {
+            if (!error) (e.currentTarget as HTMLInputElement).style.borderColor = '#5a5248';
+          }}
           {...props}
         />
         {error && (
-          <p className="text-sm text-red-600 mt-1">{error}</p>
+          <p style={{ color: '#e05555', fontSize: '0.8rem', marginTop: 4, fontWeight: 500 }}>
+            {error}
+          </p>
         )}
         {helperText && !error && (
-          <p className="text-sm text-gray-500 mt-1">{helperText}</p>
+          <p style={{ color: '#888', fontSize: '0.8rem', marginTop: 4 }}>
+            {helperText}
+          </p>
         )}
       </div>
     );

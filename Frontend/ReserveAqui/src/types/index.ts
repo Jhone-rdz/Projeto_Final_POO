@@ -43,6 +43,7 @@ export interface Restaurante {
   email: string;
   proprietario: number; // ID do usuário proprietário
   proprietario_nome?: string; // Nome do proprietário (readonly)
+  mesas_disponiveis?: number;
   quantidade_mesas: number;
   ativo: boolean;
   data_criacao: string;

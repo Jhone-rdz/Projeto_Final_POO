@@ -6,7 +6,7 @@ import { notificacoesService } from '../../services/api';
 import type { Notificacao } from '../../types';
 
 /**
- * Componente de Header/Navbar
+ * Componente de Header/Navbar — tema escuro ReservaFácil
  */
 export const Header = () => {
   const { isAuthenticated, usuario, logout } = useAuth();
@@ -20,7 +20,6 @@ export const Header = () => {
 
   const notifDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Verificar se o usuário é cliente
   const isCliente = usuario?.papeis?.some(p => p.tipo === 'cliente');
   const isFuncionario = usuario?.papeis?.some(p => p.tipo === 'funcionario');
   const isProprietario = usuario?.papeis?.some(p => p.tipo === 'admin_secundario');
@@ -35,35 +34,25 @@ export const Header = () => {
         ? '/staff/dashboard'
         : '/';
 
-  // Não mostrar header nas páginas de autenticação
   const paginasAuthenticacao = ['/login', '/register', '/recuperar-senha', '/confirmacao-recuperacao', '/redefinir-senha'];
   const ocultarHeader = paginasAuthenticacao.includes(location.pathname);
 
-  // Fechar dropdowns ao clicar fora
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (notifDropdownRef.current && !notifDropdownRef.current.contains(event.target as Node)) {
         setNotificacoesAbertas(false);
       }
     };
-
     if (notificacoesAbertas) {
       document.addEventListener('mousedown', handleClickOutside);
     }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => { document.removeEventListener('mousedown', handleClickOutside); };
   }, [notificacoesAbertas]);
 
-  // Carregar notificações quando abrir o dropdown
   useEffect(() => {
-    if (notificacoesAbertas && isCliente) {
-      carregarNotificacoes();
-    }
+    if (notificacoesAbertas && isCliente) carregarNotificacoes();
   }, [notificacoesAbertas, isCliente]);
 
-  // Polling para atualizar contador de não lidas (a cada 30 segundos)
   useEffect(() => {
     if (isAuthenticated && isCliente) {
       carregarContadorNaoLidas();
@@ -96,10 +85,7 @@ export const Header = () => {
   const handleMarcarComoLida = async (notifId: number) => {
     try {
       await notificacoesService.marcarComoLida(notifId);
-      // Atualizar localmente
-      setNotificacoes(prev =>
-        prev.map(n => (n.id === notifId ? { ...n, lido: true } : n))
-      );
+      setNotificacoes(prev => prev.map(n => (n.id === notifId ? { ...n, lido: true } : n)));
       setCountNaoLidas(prev => Math.max(0, prev - 1));
     } catch (error) {
       console.error('Erro ao marcar notificação como lida:', error);
@@ -123,7 +109,6 @@ export const Header = () => {
     const diffMinutos = Math.floor(diffMs / 60000);
     const diffHoras = Math.floor(diffMinutos / 60);
     const diffDias = Math.floor(diffHoras / 24);
-
     if (diffMinutos < 1) return 'Agora';
     if (diffMinutos < 60) return `${diffMinutos}m atrás`;
     if (diffHoras < 24) return `${diffHoras}h atrás`;
@@ -133,147 +118,167 @@ export const Header = () => {
 
   const getIconeNotificacao = (tipo: string) => {
     switch (tipo) {
-      case 'confirmacao':
-        return '✅';
-      case 'cancelamento':
-        return '❌';
-      case 'lembranca':
-        return '⏰';
-      case 'atualizacao':
-        return '🔄';
-      default:
-        return '📢';
+      case 'confirmacao': return '✅';
+      case 'cancelamento': return '❌';
+      case 'lembranca': return '⏰';
+      case 'atualizacao': return '🔄';
+      default: return '📢';
     }
   };
 
-  if (ocultarHeader) {
-    return null;
-  }
+  if (ocultarHeader) return null;
+
+  // ── Estilos do tema ──
+  const GOLD = '#C9922A';
+  const headerBg = '#1a1a1a';
+  const borderGold = `1px solid ${GOLD}`;
 
   return (
-    <header className="w-full bg-white shadow-sm sticky top-0 z-50">
+    <header
+      className="w-full sticky top-0 z-50"
+      style={{ backgroundColor: headerBg, borderBottom: `2px solid ${GOLD}` }}
+    >
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
+
           {/* Logo */}
-          <Link to={dashboardPath} className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold">
-              R
-            </div>
-            <span className="font-bold text-xl text-gray-900">ReserveAqui</span>
+          <Link to={dashboardPath} className="flex items-center gap-2 no-underline">
+            {/* Ícone calendário/reserva */}
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+              <rect x="2" y="4" width="24" height="22" rx="3" stroke={GOLD} strokeWidth="2" fill="none" />
+              <path d="M2 10h24" stroke={GOLD} strokeWidth="2" />
+              <rect x="7" y="2" width="3" height="5" rx="1.5" fill={GOLD} />
+              <rect x="18" y="2" width="3" height="5" rx="1.5" fill={GOLD} />
+              <path d="M8 16l3 3 6-6" stroke={GOLD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span
+              style={{
+                color: GOLD,
+                fontWeight: 700,
+                fontSize: '1.2rem',
+                fontFamily: "'Georgia', serif",
+                letterSpacing: '0.01em',
+              }}
+            >
+              ReservaFácil
+            </span>
           </Link>
 
-          {/* Menu Desktop */}
+          {/* Nav Desktop */}
           <nav className="hidden md:flex items-center gap-8">
             {!isPainelInterno && (
               <>
-                <Link to="/" className="text-gray-600 hover:text-blue-600 font-medium">
-                  Home
+                <Link
+                  to="/"
+                  style={{ color: '#ccc', fontWeight: 500, textDecoration: 'none', fontSize: '0.95rem' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = GOLD)}
+                  onMouseLeave={e => (e.currentTarget.style.color = '#ccc')}
+                >
+                  Inicio
                 </Link>
-                <Link to="/restaurants" className="text-gray-600 hover:text-blue-600 font-medium">
+                <Link
+                  to="/restaurants"
+                  style={{ color: '#ccc', fontWeight: 500, textDecoration: 'none', fontSize: '0.95rem' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = GOLD)}
+                  onMouseLeave={e => (e.currentTarget.style.color = '#ccc')}
+                >
                   Restaurantes
                 </Link>
               </>
             )}
             {isAuthenticated && isCliente && !isPainelInterno && (
-              <Link to="/reservations" className="text-gray-600 hover:text-blue-600 font-medium">
+              <Link
+                to="/reservations"
+                style={{ color: '#ccc', fontWeight: 500, textDecoration: 'none', fontSize: '0.95rem' }}
+                onMouseEnter={e => (e.currentTarget.style.color = GOLD)}
+                onMouseLeave={e => (e.currentTarget.style.color = '#ccc')}
+              >
                 Minhas Reservas
               </Link>
             )}
           </nav>
 
           {/* Ações à direita */}
-          <div className="flex items-center gap-4">
-            {/* Notificações - Apenas para Clientes */}
+          <div className="flex items-center gap-3">
+
+            {/* Notificações */}
             {isAuthenticated && isCliente && (
               <div className="relative" ref={notifDropdownRef}>
                 <button
                   onClick={() => setNotificacoesAbertas(!notificacoesAbertas)}
-                  className="relative p-2 text-gray-600 hover:text-blue-600 transition-colors"
+                  className="relative p-2"
+                  style={{ color: '#ccc', background: 'none', border: 'none', cursor: 'pointer' }}
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                       d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
                     />
                   </svg>
                   {countNaoLidas > 0 && (
-                    <span className="absolute top-0 right-0 w-5 h-5 bg-red-600 rounded-full text-white text-xs font-bold flex items-center justify-center">
+                    <span
+                      className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-white text-xs flex items-center justify-center font-bold"
+                      style={{ backgroundColor: GOLD }}
+                    >
                       {countNaoLidas > 9 ? '9+' : countNaoLidas}
                     </span>
                   )}
                 </button>
 
-                {/* Dropdown de Notificações */}
                 {notificacoesAbertas && (
-                  <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[500px] overflow-hidden flex flex-col">
-                    {/* Cabeçalho */}
-                    <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-gray-50">
-                      <h3 className="font-bold text-gray-900">🔔 Notificações</h3>
-                      {notificacoes.some(n => !n.lido) && (
+                  <div
+                    className="absolute right-0 mt-2 w-80 rounded-xl shadow-2xl z-50 overflow-hidden"
+                    style={{ backgroundColor: '#222', border: `1px solid #444` }}
+                  >
+                    <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid #333' }}>
+                      <h3 className="font-semibold" style={{ color: '#fff' }}>Notificações</h3>
+                      {countNaoLidas > 0 && (
                         <button
                           onClick={handleMarcarTodasComoLidas}
-                          className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                          className="text-xs"
+                          style={{ color: GOLD, background: 'none', border: 'none', cursor: 'pointer' }}
                         >
                           Marcar todas como lidas
                         </button>
                       )}
                     </div>
 
-                    {/* Lista de Notificações */}
-                    <div className="overflow-y-auto flex-1">
+                    <div className="max-h-96 overflow-y-auto">
                       {carregandoNotificacoes ? (
-                        <div className="p-8 text-center">
-                          <div className="inline-block w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-                          <p className="mt-2 text-sm text-gray-600">Carregando...</p>
-                        </div>
+                        <div className="p-8 text-center" style={{ color: '#aaa' }}>Carregando...</div>
                       ) : notificacoes.length === 0 ? (
-                        <div className="p-8 text-center">
-                          <div className="text-4xl mb-2">📭</div>
-                          <p className="text-gray-600">Você não tem notificações</p>
-                        </div>
+                        <div className="p-8 text-center" style={{ color: '#aaa' }}>Nenhuma notificação</div>
                       ) : (
-                        <div className="divide-y divide-gray-200">
-                          {notificacoes.map((notif) => (
-                            <div
-                              key={notif.id}
-                              className={`p-4 hover:bg-gray-50 transition-colors cursor-pointer ${
-                                !notif.lido ? 'bg-blue-50' : ''
-                              }`}
-                              onClick={() => !notif.lido && handleMarcarComoLida(notif.id)}
-                            >
-                              <div className="flex items-start gap-3">
-                                <div className="text-2xl flex-shrink-0">
-                                  {getIconeNotificacao(notif.tipo)}
+                        notificacoes.map(notif => (
+                          <div
+                            key={notif.id}
+                            className="px-4 py-3 cursor-pointer"
+                            style={{
+                              borderBottom: '1px solid #333',
+                              backgroundColor: !notif.lido ? '#2a2a2a' : 'transparent',
+                            }}
+                            onClick={() => !notif.lido && handleMarcarComoLida(notif.id)}
+                          >
+                            <div className="flex items-start gap-3">
+                              <span className="text-xl flex-shrink-0">{getIconeNotificacao(notif.tipo)}</span>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between mb-1">
+                                  <h4 className="font-semibold text-sm" style={{ color: '#fff' }}>{notif.titulo}</h4>
+                                  {!notif.lido && (
+                                    <span className="w-2 h-2 rounded-full flex-shrink-0 ml-2 mt-1" style={{ backgroundColor: GOLD }} />
+                                  )}
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-start justify-between mb-1">
-                                    <h4 className="font-semibold text-gray-900 text-sm">
-                                      {notif.titulo}
-                                    </h4>
-                                    {!notif.lido && (
-                                      <span className="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0 ml-2 mt-1"></span>
-                                    )}
-                                  </div>
-                                  <p className="text-sm text-gray-600 line-clamp-2">
-                                    {notif.mensagem}
-                                  </p>
-                                  <p className="text-xs text-gray-500 mt-1">
-                                    {formatarDataRelativa(notif.data_criacao)}
-                                  </p>
-                                </div>
+                                <p className="text-sm line-clamp-2" style={{ color: '#aaa' }}>{notif.mensagem}</p>
+                                <p className="text-xs mt-1" style={{ color: '#666' }}>{formatarDataRelativa(notif.data_criacao)}</p>
                               </div>
                             </div>
-                          ))}
-                        </div>
+                          </div>
+                        ))
                       )}
                     </div>
 
-                    {/* Rodapé */}
                     {notificacoes.length > 0 && (
-                      <div className="px-4 py-2 border-t border-gray-200 bg-gray-50">
-                        <p className="text-xs text-gray-500 text-center">
+                      <div className="px-4 py-2" style={{ borderTop: '1px solid #333', backgroundColor: '#1a1a1a' }}>
+                        <p className="text-xs text-center" style={{ color: '#666' }}>
                           Total: {notificacoes.length} notifica{notificacoes.length === 1 ? 'ção' : 'ções'}
                         </p>
                       </div>
@@ -283,111 +288,119 @@ export const Header = () => {
               </div>
             )}
 
-            {/* Menu Usuário */}
+            {/* Usuário autenticado */}
             {isAuthenticated && usuario ? (
               <div className="relative">
                 <button
                   onClick={() => setPerfilAberto(!perfilAberto)}
-                  className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
+                  style={{ background: 'none', border: borderGold, cursor: 'pointer' }}
                 >
-                  <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
+                  <div
+                    className="w-7 h-7 rounded-full flex items-center justify-center font-bold text-sm"
+                    style={{ backgroundColor: GOLD, color: '#1a1a1a' }}
+                  >
                     {usuario.nome.charAt(0).toUpperCase()}
                   </div>
-                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                  <svg className="w-3 h-3" style={{ color: GOLD }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
 
-                {/* Menu Perfil Dropdown */}
                 {perfilAberto && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl py-2 z-50">
-                    <div className="px-4 py-2 border-b border-gray-200">
-                      <p className="font-medium text-gray-900">{usuario.nome}</p>
-                      <p className="text-sm text-gray-600">{usuario.email}</p>
+                  <div
+                    className="absolute right-0 mt-2 w-52 rounded-xl shadow-2xl py-2 z-50"
+                    style={{ backgroundColor: '#222', border: '1px solid #444' }}
+                  >
+                    <div className="px-4 py-3" style={{ borderBottom: '1px solid #333' }}>
+                      <p className="font-semibold" style={{ color: '#fff', fontSize: '0.9rem' }}>{usuario.nome}</p>
+                      <p className="text-xs" style={{ color: '#888' }}>{usuario.email}</p>
                     </div>
 
-                    {/* Link do Dashboard para Funcionário */}
                     {usuario.papeis?.some(p => p.tipo === 'funcionario') && (
-                      <Link
-                        to="/staff/dashboard"
-                        onClick={() => setPerfilAberto(false)}
-                        className="block px-4 py-2 hover:bg-gray-100 text-gray-700 font-medium"
-                      >
-                        👔 Dashboard Funcionário
-                      </Link>
+                      <Link to="/staff/dashboard" onClick={() => setPerfilAberto(false)}
+                        className="block px-4 py-2 text-sm font-medium"
+                        style={{ color: '#ddd', textDecoration: 'none' }}
+                      >👔 Dashboard Funcionário</Link>
                     )}
-
-                    {/* Link do Dashboard para Proprietário */}
                     {usuario.papeis?.some(p => p.tipo === 'admin_secundario') && (
                       <>
-                        <Link
-                          to="/owner/dashboard"
-                          onClick={() => setPerfilAberto(false)}
-                          className="block px-4 py-2 hover:bg-gray-100 text-gray-700 font-medium"
-                        >
-                          🏪 Dashboard
-                        </Link>
-                        <Link
-                          to="/owner/restaurant"
-                          onClick={() => setPerfilAberto(false)}
-                          className="block px-4 py-2 hover:bg-gray-100 text-gray-700 font-medium"
-                        >
-                          ⚙️ Gerenciar Restaurante
-                        </Link>
+                        <Link to="/owner/dashboard" onClick={() => setPerfilAberto(false)}
+                          className="block px-4 py-2 text-sm font-medium"
+                          style={{ color: '#ddd', textDecoration: 'none' }}
+                        >🏪 Dashboard</Link>
+                        <Link to="/owner/restaurant" onClick={() => setPerfilAberto(false)}
+                          className="block px-4 py-2 text-sm font-medium"
+                          style={{ color: '#ddd', textDecoration: 'none' }}
+                        >⚙️ Gerenciar Restaurante</Link>
                       </>
                     )}
-
-                    {/* Link do Dashboard para Admin */}
                     {usuario.papeis?.some(p => p.tipo === 'admin_sistema') && (
-                      <Link
-                        to="/admin/dashboard"
-                        onClick={() => setPerfilAberto(false)}
-                        className="block px-4 py-2 hover:bg-gray-100 text-gray-700 font-medium"
-                      >
-                        🔧 Dashboard Admin
-                      </Link>
+                      <Link to="/admin/dashboard" onClick={() => setPerfilAberto(false)}
+                        className="block px-4 py-2 text-sm font-medium"
+                        style={{ color: '#ddd', textDecoration: 'none' }}
+                      >🔧 Dashboard Admin</Link>
                     )}
-
-                    <Link
-                      to="/profile"
-                      onClick={() => setPerfilAberto(false)}
-                      className="block px-4 py-2 hover:bg-gray-100 text-gray-700 font-medium"
-                    >
-                      👤 Meu Perfil
-                    </Link>
-
+                    <Link to="/profile" onClick={() => setPerfilAberto(false)}
+                      className="block px-4 py-2 text-sm font-medium"
+                      style={{ color: '#ddd', textDecoration: 'none' }}
+                    >👤 Meu Perfil</Link>
                     <button
-                      onClick={() => {
-                        logout();
-                        setPerfilAberto(false);
-                      }}
-                      className="w-full text-left px-4 py-2 hover:bg-gray-100 text-red-600 font-medium"
-                    >
-                      🚪 Sair
-                    </button>
+                      onClick={() => { logout(); setPerfilAberto(false); }}
+                      className="w-full text-left px-4 py-2 text-sm font-medium"
+                      style={{ color: '#e05555', background: 'none', border: 'none', cursor: 'pointer' }}
+                    >🚪 Sair</button>
                   </div>
                 )}
               </div>
             ) : (
-              /* Botões Entrar/Cadastrar */
-              <div className="hidden sm:flex items-center gap-3">
+              <div className="hidden sm:flex items-center gap-2">
                 <Link to="/login">
-                  <Button variant="secondary" size="sm">
+                  <button
+                    style={{
+                      background: 'none',
+                      border: borderGold,
+                      color: GOLD,
+                      borderRadius: 8,
+                      padding: '7px 20px',
+                      fontWeight: 700,
+                      fontSize: '0.9rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = GOLD; (e.currentTarget as HTMLButtonElement).style.color = '#1a1a1a'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = GOLD; }}
+                  >
                     Entrar
-                  </Button>
+                  </button>
                 </Link>
                 <Link to="/register">
-                  <Button variant="primary" size="sm">
+                  <button
+                    style={{
+                      backgroundColor: GOLD,
+                      border: borderGold,
+                      color: '#fff',
+                      borderRadius: 8,
+                      padding: '7px 20px',
+                      fontWeight: 700,
+                      fontSize: '0.9rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#b07e1e'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = GOLD; }}
+                  >
                     Cadastrar
-                  </Button>
+                  </button>
                 </Link>
               </div>
             )}
 
-            {/* Menu Mobile */}
+            {/* Menu Mobile toggle */}
             <button
               onClick={() => setMenuAberto(!menuAberto)}
-              className="md:hidden p-2 rounded-lg hover:bg-gray-100"
+              className="md:hidden p-2 rounded-lg"
+              style={{ color: GOLD, background: 'none', border: 'none', cursor: 'pointer' }}
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -398,34 +411,23 @@ export const Header = () => {
 
         {/* Menu Mobile */}
         {menuAberto && (
-          <div className="md:hidden py-4 border-t border-gray-200">
+          <div className="md:hidden py-4" style={{ borderTop: '1px solid #333' }}>
             {!isPainelInterno && (
               <>
-                <Link to="/" className="block px-4 py-2 text-gray-600 hover:text-blue-600 font-medium">
-                  Home
-                </Link>
-                <Link to="/restaurants" className="block px-4 py-2 text-gray-600 hover:text-blue-600 font-medium">
-                  Restaurantes
-                </Link>
+                <Link to="/" className="block px-4 py-2 font-medium" style={{ color: '#ccc', textDecoration: 'none' }}>Home</Link>
+                <Link to="/restaurants" className="block px-4 py-2 font-medium" style={{ color: '#ccc', textDecoration: 'none' }}>Restaurantes</Link>
               </>
             )}
             {isAuthenticated && isCliente && !isPainelInterno && (
-              <Link to="/reservations" className="block px-4 py-2 text-gray-600 hover:text-blue-600 font-medium">
-                Minhas Reservas
-              </Link>
+              <Link to="/reservations" className="block px-4 py-2 font-medium" style={{ color: '#ccc', textDecoration: 'none' }}>Minhas Reservas</Link>
             )}
-
             {!isAuthenticated && (
-              <div className="flex gap-2 px-4 py-4">
+              <div className="flex gap-2 px-4 pt-3">
                 <Link to="/login" className="flex-1">
-                  <Button variant="secondary" size="sm" className="w-full">
-                    Entrar
-                  </Button>
+                  <button className="w-full py-2 rounded-lg font-bold" style={{ background: 'none', border: `1px solid ${GOLD}`, color: GOLD, cursor: 'pointer' }}>Entrar</button>
                 </Link>
                 <Link to="/register" className="flex-1">
-                  <Button variant="primary" size="sm" className="w-full">
-                    Cadastrar
-                  </Button>
+                  <button className="w-full py-2 rounded-lg font-bold" style={{ backgroundColor: GOLD, border: 'none', color: '#fff', cursor: 'pointer' }}>Cadastrar</button>
                 </Link>
               </div>
             )}
