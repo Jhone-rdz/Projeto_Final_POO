@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context';
-import { Input, Button, Alert } from '../../components/common';
+import { Input, Alert } from '../../components/common';
+
+const GOLD = '#C9922A';
 
 interface FormErrors {
   novaSenha?: string;
@@ -9,7 +11,7 @@ interface FormErrors {
 }
 
 /**
- * Página de Redefinição de Senha (via link do email)
+ * Página de Redefinição de Senha — tema ReservaFácil
  */
 export default function RedefinirSenha() {
   const navigate = useNavigate();
@@ -17,35 +19,19 @@ export default function RedefinirSenha() {
   const { redefinirSenha, error: authError, clearError } = useAuth();
 
   const [token, setToken] = useState('');
-  const [formData, setFormData] = useState({
-    novaSenha: '',
-    confirmarSenha: '',
-  });
-
+  const [formData, setFormData] = useState({ novaSenha: '', confirmarSenha: '' });
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const [successMessage, setSuccessMessage] = useState('');
-  const [step, setStep] = useState<'form' | 'sucesso'>('form');
   const [senhaForca, setSenhaForca] = useState<'fraca' | 'media' | 'forte'>('fraca');
   const [tokenInvalido, setTokenInvalido] = useState(false);
 
-  /**
-   * Verificar token na URL ao montar
-   */
   useEffect(() => {
     const tokenParam = searchParams.get('token');
-
-    if (!tokenParam) {
-      setTokenInvalido(true);
-      return;
-    }
-
+    if (!tokenParam) { setTokenInvalido(true); return; }
     setToken(tokenParam);
   }, [searchParams]);
 
-  /**
-   * Verificar força da senha
-   */
   const verificarForcaSenha = (senha: string): 'fraca' | 'media' | 'forte' => {
     if (senha.length < 6) return 'fraca';
     if (senha.length < 10) return 'media';
@@ -53,72 +39,39 @@ export default function RedefinirSenha() {
     return 'media';
   };
 
-  /**
-   * Atualizar campo do formulário
-   */
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
-
-    // Limpar erro do campo
-    if (errors[name as keyof FormErrors]) {
-      setErrors({ ...errors, [name]: undefined });
-    }
-
-    // Atualizar força da senha
-    if (name === 'novaSenha') {
-      setSenhaForca(verificarForcaSenha(value));
-    }
+    if (errors[name as keyof FormErrors]) setErrors({ ...errors, [name]: undefined });
+    if (name === 'novaSenha') setSenhaForca(verificarForcaSenha(value));
   };
 
-  /**
-   * Validar formulário
-   */
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
-
-    // Nova Senha
     if (!formData.novaSenha) {
       newErrors.novaSenha = 'Nova senha é obrigatória';
     } else if (formData.novaSenha.length < 6) {
       newErrors.novaSenha = 'Senha deve ter pelo menos 6 caracteres';
     }
-
-    // Confirmar Senha
     if (!formData.confirmarSenha) {
       newErrors.confirmarSenha = 'Confirmação de senha é obrigatória';
     } else if (formData.novaSenha !== formData.confirmarSenha) {
       newErrors.confirmarSenha = 'As senhas não coincidem';
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  /**
-   * Redefinir senha
-   */
   const handleRedefinirSenha = async (e: React.FormEvent) => {
     e.preventDefault();
     clearError();
     setSuccessMessage('');
-
-    if (!validateForm()) {
-      return;
-    }
-
+    if (!validateForm()) return;
     setIsLoading(true);
-
     try {
       await redefinirSenha(token, formData.novaSenha);
-      
-      setSuccessMessage('Senha redefinida com sucesso!');
-      setStep('sucesso');
-
-      // Redirecionar após sucesso
-      setTimeout(() => {
-        navigate('/login');
-      }, 2000);
+      setSuccessMessage('Senha redefinida com sucesso');
+      setTimeout(() => navigate('/login'), 2000);
     } catch (err) {
       console.error('Erro ao redefinir senha:', err);
     } finally {
@@ -126,227 +79,182 @@ export default function RedefinirSenha() {
     }
   };
 
-  // Token inválido
-  if (tokenInvalido) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-        <div className="w-full max-w-md">
-          <div className="bg-white rounded-xl shadow-lg p-8">
-            <div className="text-center space-y-4">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full">
-                <svg
-                  className="w-8 h-8 text-red-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 9v2m0 4v2m0 0v-2m0 2h0m-9-9h18M4 5h16c1.1 0 2 .9 2 2v14c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V7c0-1.1.9-2 2-2z"
-                  />
-                </svg>
-              </div>
+  const forcaBarraCor = { fraca: '#e05555', media: GOLD, forte: '#2d7a40' };
+  const forcaBarraLargura = { fraca: '33%', media: '66%', forte: '100%' };
+  const forcaTexto = { fraca: 'Fraca', media: 'Média', forte: 'Forte' };
 
-              <h2 className="text-2xl font-bold text-gray-900">Link Inválido ou Expirado</h2>
-
-              <p className="text-gray-600 text-sm">
-                O link para redefinir sua senha é inválido ou expirou. 
-                Links de redefinição são válidos por 1 hora.
-              </p>
-
-              <div className="space-y-3 pt-4">
-                <Link to="/recuperar-senha">
-                  <Button
-                    type="button"
-                    variant="primary"
-                    size="lg"
-                    className="w-full"
-                  >
-                    Solicitar novo link
-                  </Button>
-                </Link>
-
-                <Link to="/login">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="lg"
-                    className="w-full"
-                  >
-                    Voltar para Login
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </div>
-
-          <div className="text-center mt-8 text-gray-600 text-sm">
-            <p>© 2026 ReserveAqui. Todos os direitos reservados.</p>
+  // ── Header e Footer reutilizados ──
+  const PageShell = ({ children }: { children: React.ReactNode }) => (
+    <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#E8E4DE' }}>
+      <header className="w-full sticky top-0 z-50" style={{ backgroundColor: '#1a1a1a', borderBottom: `2px solid ${GOLD}` }}>
+        <div className="w-full max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2" style={{ textDecoration: 'none' }}>
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+              <rect x="2" y="4" width="24" height="22" rx="3" stroke={GOLD} strokeWidth="2" fill="none" />
+              <path d="M2 10h24" stroke={GOLD} strokeWidth="2" />
+              <rect x="7" y="2" width="3" height="5" rx="1.5" fill={GOLD} />
+              <rect x="18" y="2" width="3" height="5" rx="1.5" fill={GOLD} />
+              <path d="M8 16l3 3 6-6" stroke={GOLD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span style={{ color: GOLD, fontWeight: 700, fontSize: '1.2rem', fontFamily: "'Georgia', serif" }}>ReservaFácil</span>
+          </Link>
+          <div className="flex items-center gap-2">
+            <Link to="/login"><button style={{ background: 'none', border: `1px solid ${GOLD}`, color: GOLD, borderRadius: 8, padding: '7px 22px', fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer' }}>Entrar</button></Link>
+            <Link to="/register"><button style={{ background: 'none', border: `1px solid ${GOLD}`, color: GOLD, borderRadius: 8, padding: '7px 22px', fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer' }}>Cadastrar</button></Link>
           </div>
         </div>
-      </div>
+      </header>
+
+      <main className="flex-1 flex flex-col items-center justify-center py-12 px-4">
+        {children}
+      </main>
+
+      <footer className="py-6 text-center">
+        <p style={{ color: '#555', fontSize: '0.85rem', fontWeight: 600 }}>© 2026 ReservaFácil. Todos os direitos reservados.</p>
+      </footer>
+    </div>
+  );
+
+  // ── Token inválido ──
+  if (tokenInvalido) {
+    return (
+      <PageShell>
+        <div className="w-full" style={{ maxWidth: 580, backgroundColor: '#4a4540', borderRadius: 16, border: `1px solid ${GOLD}`, padding: '40px 48px', boxShadow: '0 8px 40px rgba(0,0,0,0.25)' }}>
+          <h1 className="text-center font-bold mb-6" style={{ color: GOLD, fontSize: '2rem', fontFamily: "'Georgia', serif" }}>
+            Link Inválido
+          </h1>
+          <p className="text-center mb-8" style={{ color: '#aaa', fontSize: '0.95rem', lineHeight: 1.6 }}>
+            O link para redefinir sua senha é inválido ou expirou. Links de redefinição são válidos por 1 hora.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <Link to="/recuperar-senha" style={{ textDecoration: 'none' }}>
+              <button style={{ width: '100%', backgroundColor: GOLD, border: 'none', color: '#1a1a1a', borderRadius: 8, padding: '13px', fontWeight: 700, fontSize: '1.05rem', cursor: 'pointer' }}>
+                Solicitar novo link
+              </button>
+            </Link>
+            <Link to="/login" style={{ textDecoration: 'none' }}>
+              <button style={{ width: '100%', backgroundColor: 'transparent', border: `1.5px solid ${GOLD}`, color: GOLD, borderRadius: 8, padding: '13px', fontWeight: 700, fontSize: '1.05rem', cursor: 'pointer' }}>
+                Voltar para Login
+              </button>
+            </Link>
+          </div>
+        </div>
+      </PageShell>
     );
   }
 
+  // ── Formulário principal ──
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">ReserveAqui</h1>
-          <p className="text-gray-600">Reserve sua mesa com facilidade</p>
-        </div>
+    <PageShell>
+      <div
+        className="w-full"
+        style={{ maxWidth: 580, backgroundColor: '#4a4540', borderRadius: 16, border: `1px solid ${GOLD}`, padding: '40px 48px', boxShadow: '0 8px 40px rgba(0,0,0,0.25)' }}
+      >
+        {/* Título */}
+        <h1 className="text-center font-bold mb-6" style={{ color: GOLD, fontSize: '2rem', fontFamily: "'Georgia', serif" }}>
+          Redefinir senha
+        </h1>
 
-        {/* Card */}
-        <div className="bg-white rounded-xl shadow-lg p-8">
-          {step === 'form' ? (
-            <>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Redefinir Senha</h2>
-              <p className="text-gray-600 text-sm mb-6">
-                Digite uma nova senha para sua conta.
-              </p>
+        {/* Alert erro */}
+        {authError && (
+          <div className="mb-5">
+            <Alert type="error" message={authError} onClose={clearError} />
+          </div>
+        )}
 
-              {/* Erro de autenticação */}
-              {authError && (
-                <div className="mb-6">
-                  <Alert 
-                    type="error" 
-                    message={authError}
-                    onClose={clearError}
-                  />
+        {/* Alert sucesso */}
+        {successMessage && (
+          <div className="mb-5">
+            <Alert type="success" message={successMessage} />
+          </div>
+        )}
+
+        {/* Formulário */}
+        <form onSubmit={handleRedefinirSenha} className="space-y-5">
+
+          {/* Nova Senha */}
+          <div>
+            <Input
+              label="Nova senha"
+              type="password"
+              name="novaSenha"
+              placeholder="Digite sua nova senha"
+              value={formData.novaSenha}
+              onChange={handleInputChange}
+              error={errors.novaSenha}
+              disabled={isLoading}
+            />
+            {formData.novaSenha && (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ width: '100%', backgroundColor: '#2e2b27', borderRadius: 99, height: 6 }}>
+                  <div style={{ height: 6, borderRadius: 99, backgroundColor: forcaBarraCor[senhaForca], width: forcaBarraLargura[senhaForca], transition: 'width 0.3s ease, background-color 0.3s ease' }} />
                 </div>
-              )}
-
-              {/* Formulário */}
-              <form onSubmit={handleRedefinirSenha} className="space-y-4">
-                {/* Nova Senha */}
-                <div>
-                  <Input
-                    label="Nova Senha"
-                    type="password"
-                    name="novaSenha"
-                    placeholder="Crie uma nova senha"
-                    value={formData.novaSenha}
-                    onChange={handleInputChange}
-                    error={errors.novaSenha}
-                    disabled={isLoading}
-                  />
-                  
-                  {/* Indicador de força da senha */}
-                  {formData.novaSenha && (
-                    <div className="mt-2 space-y-1">
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          className={`h-2 rounded-full transition-all duration-300 ${
-                            senhaForca === 'fraca' 
-                              ? 'bg-red-500' 
-                              : senhaForca === 'media' 
-                              ? 'bg-yellow-500' 
-                              : 'bg-green-500'
-                          }`}
-                          style={{
-                            width: senhaForca === 'fraca' ? '33%' : senhaForca === 'media' ? '66%' : '100%'
-                          }}
-                        />
-                      </div>
-                      <p className="text-xs text-gray-600">
-                        Força: <span className="font-medium">
-                          {senhaForca === 'fraca' ? 'Fraca' : senhaForca === 'media' ? 'Média' : 'Forte'}
-                        </span>
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Confirmar Nova Senha */}
-                <Input
-                  label="Confirmar Nova Senha"
-                  type="password"
-                  name="confirmarSenha"
-                  placeholder="Confirme sua nova senha"
-                  value={formData.confirmarSenha}
-                  onChange={handleInputChange}
-                  error={errors.confirmarSenha}
-                  disabled={isLoading}
-                />
-
-                {/* Botão Redefinir */}
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="lg"
-                  isLoading={isLoading}
-                  className="w-full"
-                >
-                  Redefinir Senha
-                </Button>
-              </form>
-
-              {/* Link voltar */}
-              <div className="text-center mt-6">
-                <Link to="/login" className="text-blue-600 hover:text-blue-700 text-sm font-medium">
-                  Voltar para Login
-                </Link>
-              </div>
-            </>
-          ) : (
-            <>
-              {/* Tela de sucesso */}
-              <div className="text-center space-y-4">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full animate-bounce">
-                  <svg
-                    className="w-8 h-8 text-green-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                </div>
-
-                <h2 className="text-2xl font-bold text-gray-900">Senha Redefinida!</h2>
-
-                {successMessage && (
-                  <div className="mb-4">
-                    <Alert 
-                      type="success" 
-                      message={successMessage}
-                    />
-                  </div>
-                )}
-
-                <p className="text-gray-600 text-sm">
-                  Sua senha foi alterada com sucesso. 
-                  Você será redirecionado para o Login em instantes.
+                <p style={{ fontSize: '0.78rem', color: '#aaa', marginTop: 4 }}>
+                  Força: <span style={{ color: forcaBarraCor[senhaForca], fontWeight: 600 }}>{forcaTexto[senhaForca]}</span>
                 </p>
-
-                <Link to="/login">
-                  <Button
-                    type="button"
-                    variant="primary"
-                    size="lg"
-                    className="w-full mt-4"
-                  >
-                    Ir para Login agora
-                  </Button>
-                </Link>
               </div>
-            </>
-          )}
-        </div>
+            )}
+          </div>
 
-        {/* Footer de página */}
-        <div className="text-center mt-8 text-gray-600 text-sm">
-          <p>© 2026 ReserveAqui. Todos os direitos reservados.</p>
+          {/* Confirmar Nova Senha */}
+          <Input
+            label="Confirmar nova senha"
+            type="password"
+            name="confirmarSenha"
+            placeholder="Confirme sua nova senha"
+            value={formData.confirmarSenha}
+            onChange={handleInputChange}
+            error={errors.confirmarSenha}
+            disabled={isLoading}
+          />
+
+          {/* Botão Redefinir */}
+          <button
+            type="submit"
+            disabled={isLoading}
+            style={{
+              width: '100%',
+              backgroundColor: GOLD,
+              border: `2px solid ${GOLD}`,
+              color: '#1a1a1a',
+              borderRadius: 8,
+              padding: '13px',
+              fontWeight: 700,
+              fontSize: '1.05rem',
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              opacity: isLoading ? 0.7 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              transition: 'background-color 0.2s',
+              marginTop: 8,
+            }}
+            onMouseEnter={e => { if (!isLoading) (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#b07e1e'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = GOLD; }}
+          >
+            {isLoading && (
+              <svg className="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="#1a1a1a" strokeWidth="4" strokeOpacity="0.25" />
+                <path d="M12 2a10 10 0 0 1 10 10" stroke="#1a1a1a" strokeWidth="4" strokeLinecap="round" />
+              </svg>
+            )}
+            Redefinir senha
+          </button>
+        </form>
+
+        {/* Voltar para login */}
+        <div className="text-center mt-6">
+          <Link
+            to="/login"
+            style={{ color: GOLD, fontWeight: 600, fontSize: '0.95rem', textDecoration: 'none' }}
+            onMouseEnter={e => ((e.currentTarget as HTMLAnchorElement).style.textDecoration = 'underline')}
+            onMouseLeave={e => ((e.currentTarget as HTMLAnchorElement).style.textDecoration = 'none')}
+          >
+            Voltar para login
+          </Link>
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

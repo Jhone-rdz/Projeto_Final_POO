@@ -1,20 +1,20 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Header, Footer } from '../../components/layout';
-import { Input, Button, Alert } from '../../components/common';
-import { restaurantesService, mesasService, reservasService } from '../../services/api';
+import { reservasService, restaurantesService, mesasService } from '../../services/api';
 import type { Restaurante, Mesa } from '../../types';
 import { useAuth } from '../../context';
 
+const GOLD = '#C9922A';
+
 /**
- * Página de Realização de Reserva
+ * Página de Realização de Reserva — tema ReservaFácil
  */
 const Reserva = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { usuario, isAuthenticated } = useAuth();
 
-  // Estados
   const [restaurante, setRestaurante] = useState<Restaurante | null>(null);
   const [mesas, setMesas] = useState<Mesa[]>([]);
   const [mesasDisponibilidade, setMesasDisponibilidade] = useState<{ disponivel: boolean; mesas_necessarias: number; mensagem?: string } | null>(null);
@@ -22,25 +22,30 @@ const Reserva = () => {
   const [carregandoReserva, setCarregandoReserva] = useState(false);
   const [erro, setErro] = useState('');
   const [sucesso, setSuccesso] = useState(false);
+  const [sucessoMsg, setSucessoMsg] = useState('');
 
-  // Formulário
   const [formData, setFormData] = useState({
-    quantidadePessoas: 1,
+    quantidadePessoas: '',
     data: '',
-    horario: '19:00',
+    horario: '',
   });
 
-  // Carregamento inicial
+  // Horários disponíveis para o select
+  const horarios = [
+    '11:00','11:30','12:00','12:30','13:00','13:30',
+    '14:00','18:00','18:30','19:00','19:30','20:00',
+    '20:30','21:00','21:30','22:00',
+  ];
+
   useEffect(() => {
-    if (id) {
-      carregarRestaurante();
-    }
+    if (id) carregarRestaurante();
   }, [id]);
 
-  // Validação de disponibilidade em tempo real
   useEffect(() => {
-    if (restaurante && formData.data && formData.horario) {
+    if (restaurante && formData.data && formData.horario && formData.quantidadePessoas) {
       validarDisponibilidade();
+    } else {
+      setMesasDisponibilidade(null);
     }
   }, [restaurante, formData.quantidadePessoas, formData.data, formData.horario]);
 
@@ -48,17 +53,11 @@ const Reserva = () => {
     try {
       setCarregandoRestaurante(true);
       setErro('');
-
       const restauranteData = await restaurantesService.obter(Number(id));
       setRestaurante(restauranteData);
-
-      const mesasResponse = await mesasService.listar({
-        restaurante: Number(id),
-        ativa: true,
-      });
+      const mesasResponse = await mesasService.listar({ restaurante: Number(id), ativa: true });
       setMesas(mesasResponse.results || []);
-    } catch (error) {
-      console.error('Erro ao carregar restaurante:', error);
+    } catch {
       setErro('Não foi possível carregar os detalhes do restaurante.');
     } finally {
       setCarregandoRestaurante(false);
@@ -67,27 +66,13 @@ const Reserva = () => {
 
   const validarDisponibilidade = async () => {
     try {
-      // Verificar mesas disponíveis para a data e horário selecionados
       const disponibilidade = await mesasService.verificarDisponibilidade(
-        Number(id),
-        formData.data,
-        formData.horario,
-        formData.quantidadePessoas
+        Number(id), formData.data, formData.horario, Number(formData.quantidadePessoas)
       );
-
       setMesasDisponibilidade(disponibilidade);
-    } catch (error) {
-      console.error('Erro ao verificar disponibilidade:', error);
+    } catch {
       setMesasDisponibilidade(null);
     }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: name === 'quantidadePessoas' ? parseInt(value) : value,
-    }));
   };
 
   const handleReserva = async (e: React.FormEvent) => {
@@ -95,27 +80,17 @@ const Reserva = () => {
     setErro('');
     setSuccesso(false);
 
-    // Validações
-    if (formData.quantidadePessoas < 1) {
-      setErro('Informe uma quantidade válida de pessoas');
+    if (!formData.quantidadePessoas || !formData.data || !formData.horario) {
+      setErro('Preencher todos os campos');
       return;
     }
-
-    if (!formData.data) {
-      setErro('Selecione uma data');
-      return;
-    }
-
     if (!mesasDisponibilidade?.disponivel) {
       setErro('Nenhuma mesa disponível para este horário');
       return;
     }
-
-    // Validar se a data é futura
     const dataReserva = new Date(formData.data);
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
-
     if (dataReserva < hoje) {
       setErro('Selecione uma data futura');
       return;
@@ -123,321 +98,283 @@ const Reserva = () => {
 
     try {
       setCarregandoReserva(true);
-
-      // Criar reserva
       await reservasService.criar({
         restaurante: Number(id),
         data_reserva: formData.data,
         horario: formData.horario,
-        quantidade_pessoas: formData.quantidadePessoas,
+        quantidade_pessoas: Number(formData.quantidadePessoas),
         nome_cliente: usuario?.nome || '',
-        telefone_cliente: '11999999999', // TODO: Buscar do usuário
+        telefone_cliente: '11999999999',
         email_cliente: usuario?.email || '',
         observacoes: '',
       });
-
       setSuccesso(true);
-
-      // Redirecionar após 2 segundos
-      setTimeout(() => {
-        navigate('/reservations');
-      }, 2000);
-    } catch (error) {
-      console.error('Erro ao criar reserva:', error);
+      setSucessoMsg(`Suas reserva no ${restaurante?.nome} foi confirmada`);
+      setTimeout(() => navigate('/reservations'), 2500);
+    } catch {
       setErro('Erro ao processar sua reserva. Tente novamente.');
     } finally {
       setCarregandoReserva(false);
     }
   };
 
-  // Se não estiver autenticado
+  // ── Shell com fundo de restaurante ──
+  const Shell = ({ children }: { children: React.ReactNode }) => (
+    <div className="w-full flex flex-col min-h-screen" style={{ position: 'relative' }}>
+      {/* Fundo com imagem */}
+      <div
+        style={{
+          position: 'fixed', inset: 0, zIndex: 0,
+          backgroundImage: "url('https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1600&q=80')",
+          backgroundSize: 'cover', backgroundPosition: 'center',
+        }}
+      />
+      <div style={{ position: 'fixed', inset: 0, zIndex: 1, backgroundColor: 'rgba(255,235,200,0.55)' }} />
+
+      <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+        <Header />
+        <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          {children}
+        </main>
+        <Footer />
+      </div>
+
+      {/* Toast de erro — canto inferior direito */}
+      {erro && (
+        <div
+          style={{
+            position: 'fixed', bottom: 32, right: 32, zIndex: 100,
+            backgroundColor: '#e05555', borderRadius: 10,
+            padding: '14px 20px', minWidth: 220, maxWidth: 300,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
+          }}
+        >
+          <p style={{ color: '#fff', fontWeight: 700, fontSize: '0.9rem', marginBottom: 2 }}>Erro</p>
+          <p style={{ color: 'rgba(255,255,255,0.88)', fontSize: '0.85rem' }}>{erro}</p>
+        </div>
+      )}
+
+      {/* Toast de sucesso — canto inferior direito */}
+      {sucesso && (
+        <div
+          style={{
+            position: 'fixed', bottom: 32, right: 32, zIndex: 100,
+            backgroundColor: '#fff', borderRadius: 10,
+            padding: '14px 20px', minWidth: 220, maxWidth: 300,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+          }}
+        >
+          <p style={{ color: '#1a1a1a', fontWeight: 700, fontSize: '0.9rem', marginBottom: 2 }}>Reserva realizada</p>
+          <p style={{ color: '#555', fontSize: '0.85rem' }}>{sucessoMsg}</p>
+        </div>
+      )}
+    </div>
+  );
+
+  // ── Não autenticado ──
   if (!isAuthenticated) {
     return (
-      <div className="w-full flex flex-col min-h-screen bg-gray-50">
-        <Header />
-
-        <main className="w-full flex-1 flex items-center justify-center py-16">
-          <div className="bg-white rounded-lg shadow-md p-12 max-w-md text-center">
-            <svg className="w-16 h-16 text-blue-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-              />
-            </svg>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Acesso Restrito</h2>
-            <p className="text-gray-600 mb-8">Você precisa estar logado para fazer uma reserva.</p>
-            <div className="flex flex-col gap-3">
-              <Button
-                variant="primary"
-                size="md"
-                onClick={() => navigate('/login')}
-                className="w-full"
-              >
-                Entrar
-              </Button>
-              <Button
-                variant="secondary"
-                size="md"
-                onClick={() => navigate('/register')}
-                className="w-full"
-              >
-                Cadastrar
-              </Button>
-            </div>
-          </div>
-        </main>
-
-        <Footer />
-      </div>
-    );
-  }
-
-  // Carregando
-  if (carregandoRestaurante) {
-    return (
-      <div className="w-full flex flex-col min-h-screen bg-gray-50">
-        <Header />
-
-        <main className="w-full flex-1 flex items-center justify-center py-16">
-          <div className="flex flex-col items-center gap-4">
-            <div className="animate-spin">
-              <svg className="w-12 h-12 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 6v6m0 0v6m0-6h6m0 0h6M6 12a6 6 0 11-12 0 6 6 0 0112 0z"
-                />
-              </svg>
-            </div>
-            <p className="text-gray-600 font-medium">Carregando informações do restaurante...</p>
-          </div>
-        </main>
-
-        <Footer />
-      </div>
-    );
-  }
-
-  // Erro ou restaurante não encontrado
-  if (erro && !restaurante) {
-    return (
-      <div className="w-full flex flex-col min-h-screen bg-gray-50">
-        <Header />
-
-        <main className="w-full flex-1 flex items-center justify-center py-16">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-12 max-w-md text-center">
-            <svg className="w-16 h-16 text-red-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <p className="text-red-800 text-lg mb-6">{erro}</p>
-            <Button variant="primary" size="md" onClick={() => navigate('/')} className="w-full">
-              Voltar para Home
-            </Button>
-          </div>
-        </main>
-
-        <Footer />
-      </div>
-    );
-  }
-
-  return (
-    <div className="w-full flex flex-col min-h-screen bg-gray-50">
-      <Header />
-
-      <main className="w-full flex-1 py-16">
-        <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Título */}
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-gray-900">Fazer Reserva</h1>
-            <p className="text-gray-600 mt-2">
-              Complete os dados abaixo para reservar sua mesa em <span className="font-semibold">{restaurante?.nome}</span>
-            </p>
-          </div>
-
-          {/* Sucesso */}
-          {sucesso && (
-            <Alert
-              type="success"
-              message="✓ Reserva realizada com sucesso! Você será redirecionado para suas reservas..."
-            />
-          )}
-
-          {/* Erro */}
-          {erro && (
-            <Alert type="error" message={erro} onClose={() => setErro('')} />
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Formulário */}
-            <div className="md:col-span-2">
-              <div className="bg-white rounded-lg shadow-md p-8">
-                <form onSubmit={handleReserva}>
-                  {/* Dados do Usuário */}
-                  <div className="mb-8 pb-8 border-b border-gray-200">
-                    <h2 className="text-xl font-bold text-gray-900 mb-4">Seus Dados</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <Input
-                        label="Nome"
-                        value={usuario?.nome || ''}
-                        disabled
-                        className="bg-gray-50"
-                      />
-                      <Input
-                        label="Email"
-                        type="email"
-                        value={usuario?.email || ''}
-                        disabled
-                        className="bg-gray-50"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Dados da Reserva */}
-                  <div className="mb-8">
-                    <h2 className="text-xl font-bold text-gray-900 mb-4">Detalhes da Reserva</h2>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      {/* Data */}
-                      <Input
-                        type="date"
-                        label="Data"
-                        name="data"
-                        value={formData.data}
-                        onChange={handleInputChange}
-                        required
-                        disabled={carregandoReserva}
-                      />
-
-                      {/* Horário */}
-                      <Input
-                        type="time"
-                        label="Horário"
-                        name="horario"
-                        value={formData.horario}
-                        onChange={handleInputChange}
-                        required
-                        disabled={carregandoReserva}
-                      />
-                    </div>
-
-                    {/* Quantidade de Pessoas */}
-                    <Input
-                      type="number"
-                      label="Quantidade de Pessoas"
-                      name="quantidadePessoas"
-                      value={formData.quantidadePessoas}
-                      onChange={handleInputChange}
-                      min="1"
-                      max="20"
-                      required
-                      disabled={carregandoReserva}
-                    />
-                  </div>
-
-                  {/* Botão de Envio */}
-                  <div className="flex gap-3">
-                    <Button
-                      variant="secondary"
-                      size="md"
-                      type="button"
-                      onClick={() => navigate(-1)}
-                      disabled={carregandoReserva}
-                      className="flex-1"
-                    >
-                      Voltar
-                    </Button>
-                    <Button
-                      variant="primary"
-                      size="md"
-                      type="submit"
-                      isLoading={carregandoReserva}
-                      disabled={!mesasDisponibilidade?.disponivel || carregandoReserva}
-                      className="flex-1"
-                    >
-                      {!mesasDisponibilidade?.disponivel ? 'Sem Mesas Disponíveis' : 'Confirmar Reserva'}
-                    </Button>
-                  </div>
-                </form>
-              </div>
-            </div>
-
-            {/* Resumo */}
-            <div>
-              {/* Resumo do Restaurante */}
-              <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Resumo</h3>
-
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-sm text-gray-600">Restaurante</p>
-                    <p className="font-semibold text-gray-900">{restaurante?.nome}</p>
-                  </div>
-
-                  <div className="border-t border-gray-200 pt-4">
-                    <p className="text-sm text-gray-600">Data Selecionada</p>
-                    <p className="font-semibold text-gray-900">
-                      {formData.data
-                        ? new Date(formData.data).toLocaleDateString('pt-BR', {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
-                          })
-                        : 'Não selecionada'}
-                    </p>
-                  </div>
-
-                  <div className="border-t border-gray-200 pt-4">
-                    <p className="text-sm text-gray-600">Horário</p>
-                    <p className="font-semibold text-gray-900">{formData.horario}</p>
-                  </div>
-
-                  <div className="border-t border-gray-200 pt-4">
-                    <p className="text-sm text-gray-600">Quantidade de Pessoas</p>
-                    <p className="font-semibold text-gray-900">{formData.quantidadePessoas}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Disponibilidade */}
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Mesas Disponíveis</h3>
-
-                {mesasDisponibilidade?.disponivel ? (
-                  <div>
-                    <div className="mb-4 p-4 bg-green-50 rounded-lg border border-green-200">
-                      <p className="text-green-800 font-semibold">✓ Mesas Disponíveis</p>
-                      <p className="text-2xl font-bold text-green-600 mt-2">
-                        {mesasDisponibilidade.mesas_necessarias}
-                      </p>
-                    </div>
-                    <p className="text-sm text-gray-600">Clique em "Confirmar Reserva" para prosseguir</p>
-                  </div>
-                ) : (
-                  <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-                    <p className="text-orange-800 font-semibold">⚠ Sem Disponibilidade</p>
-                    <p className="text-sm text-orange-700 mt-2">
-                      Nenhuma mesa disponível para este horário. Tente outra data ou horário.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
+      <Shell>
+        <div style={{ backgroundColor: '#fff', borderRadius: 14, padding: '48px 40px', maxWidth: 420, margin: '0 auto', textAlign: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.15)' }}>
+          <svg className="mx-auto mb-4" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="1.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#1a1a1a', marginBottom: 8 }}>Acesso Restrito</h2>
+          <p style={{ color: '#666', marginBottom: 24, fontSize: '0.95rem' }}>Você precisa estar logado para fazer uma reserva.</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <button onClick={() => navigate('/login')} style={{ backgroundColor: GOLD, border: 'none', color: '#1a1a1a', borderRadius: 8, padding: '11px', fontWeight: 700, cursor: 'pointer', fontSize: '1rem' }}>Entrar</button>
+            <button onClick={() => navigate('/register')} style={{ backgroundColor: 'transparent', border: `1.5px solid ${GOLD}`, color: GOLD, borderRadius: 8, padding: '11px', fontWeight: 700, cursor: 'pointer', fontSize: '1rem' }}>Cadastrar</button>
           </div>
         </div>
-      </main>
+      </Shell>
+    );
+  }
 
-      <Footer />
-    </div>
+  // ── Carregando ──
+  if (carregandoRestaurante) {
+    return (
+      <Shell>
+        <div className="flex flex-col items-center justify-center py-24 gap-4">
+          <div className="animate-spin rounded-full" style={{ width: 44, height: 44, border: '4px solid rgba(201,146,42,0.3)', borderTopColor: GOLD }} />
+          <p style={{ color: '#333', fontWeight: 500 }}>Carregando informações do restaurante...</p>
+        </div>
+      </Shell>
+    );
+  }
+
+  // ── Erro sem restaurante ──
+  if (erro && !restaurante) {
+    return (
+      <Shell>
+        <div style={{ backgroundColor: '#fff', borderRadius: 14, padding: '48px 40px', maxWidth: 420, margin: '0 auto', textAlign: 'center' }}>
+          <p style={{ color: '#e05555', fontSize: '1rem', marginBottom: 20 }}>{erro}</p>
+          <button onClick={() => navigate('/')} style={{ backgroundColor: GOLD, border: 'none', color: '#1a1a1a', borderRadius: 8, padding: '11px 28px', fontWeight: 700, cursor: 'pointer' }}>Voltar para Home</button>
+        </div>
+      </Shell>
+    );
+  }
+
+  const mesasCount = mesas.length;
+
+  // Opções de nº de pessoas
+  const pessoasOpts = Array.from({ length: 10 }, (_, i) => i + 1);
+
+  const selectStyle: React.CSSProperties = {
+    width: '100%',
+    backgroundColor: '#f0ece6',
+    border: '1px solid #d0c8bc',
+    borderRadius: 8,
+    padding: '10px 14px',
+    color: '#1a1a1a',
+    fontSize: '0.95rem',
+    outline: 'none',
+    appearance: 'none',
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%231a1a1a' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 12px center',
+    paddingRight: 36,
+    cursor: 'pointer',
+    boxSizing: 'border-box',
+  };
+
+  const inputDateStyle: React.CSSProperties = {
+    width: '100%',
+    backgroundColor: '#f0ece6',
+    border: '1px solid #d0c8bc',
+    borderRadius: 8,
+    padding: '10px 14px',
+    color: '#1a1a1a',
+    fontSize: '0.95rem',
+    outline: 'none',
+    boxSizing: 'border-box',
+  };
+
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    color: '#1a1a1a',
+    fontWeight: 600,
+    fontSize: '0.9rem',
+    marginBottom: 6,
+  };
+
+  return (
+    <Shell>
+      {/* Voltar */}
+      <button
+        onClick={() => navigate(`/restaurantes/${id}`)}
+        style={{ background: 'none', border: 'none', color: GOLD, fontWeight: 700, fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 16, padding: 0 }}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2.5" strokeLinecap="round">
+          <path d="M19 12H5M12 5l-7 7 7 7" />
+        </svg>
+        Voltar para {restaurante?.nome}
+      </button>
+
+      {/* Título */}
+      <h1 style={{ fontSize: '1.8rem', fontWeight: 700, color: '#1a1a1a', marginBottom: 4 }}>Fazer reserva</h1>
+      <p style={{ color: '#1a1a1a', fontWeight: 600, marginBottom: 24, fontSize: '0.95rem' }}>
+        {restaurante?.nome} • {mesasCount} mesas disponíveis
+      </p>
+
+      {/* Card do formulário */}
+      <div style={{ backgroundColor: '#fff', borderRadius: 14, padding: '28px 32px', boxShadow: '0 4px 24px rgba(0,0,0,0.12)' }}>
+        <form onSubmit={handleReserva}>
+
+          {/* Reservando como */}
+          <div style={{ backgroundColor: '#f0ece6', borderRadius: 8, padding: '14px 18px', marginBottom: 24 }}>
+            <p style={{ color: '#1a1a1a', fontSize: '0.95rem', margin: 0 }}>
+              Reservando como: <span style={{ color: GOLD, fontWeight: 700 }}>{usuario?.nome}</span>
+            </p>
+            <p style={{ color: '#666', fontSize: '0.85rem', margin: '2px 0 0' }}>{usuario?.email}</p>
+          </div>
+
+          {/* Campos em 3 colunas */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
+            {/* Nº de pessoas */}
+            <div>
+              <label style={labelStyle}>N° de pessoas</label>
+              <select
+                value={formData.quantidadePessoas}
+                onChange={e => setFormData({ ...formData, quantidadePessoas: e.target.value })}
+                disabled={carregandoReserva}
+                style={selectStyle}
+              >
+                <option value="">Selecione</option>
+                {pessoasOpts.map(n => (
+                  <option key={n} value={n}>{n} {n === 1 ? 'pessoa' : 'pessoas'}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Data */}
+            <div>
+              <label style={labelStyle}>Data</label>
+              <input
+                type="date"
+                value={formData.data}
+                onChange={e => setFormData({ ...formData, data: e.target.value })}
+                disabled={carregandoReserva}
+                style={inputDateStyle}
+              />
+            </div>
+
+            {/* Horário */}
+            <div>
+              <label style={labelStyle}>Horário</label>
+              <select
+                value={formData.horario}
+                onChange={e => setFormData({ ...formData, horario: e.target.value })}
+                disabled={carregandoReserva}
+                style={selectStyle}
+              >
+                <option value="">Selecione</option>
+                {horarios.map(h => <option key={h} value={h}>{h}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Disponibilidade inline */}
+          {mesasDisponibilidade?.disponivel && (
+            <div style={{ backgroundColor: '#f0f9f4', border: '1px solid #b7dfc8', borderRadius: 8, padding: '12px 16px', marginBottom: 20, fontSize: '0.9rem', color: '#1a5c35', fontWeight: 500 }}>
+              ✅ {mesasDisponibilidade.mesas_necessarias} mesas disponíveis para {formData.quantidadePessoas} pessoa(s) em {formData.data} às {formData.horario}
+            </div>
+          )}
+
+          {/* Botão confirmar */}
+          <button
+            type="submit"
+            disabled={carregandoReserva}
+            style={{
+              width: '100%',
+              backgroundColor: GOLD,
+              border: 'none',
+              color: '#fff',
+              borderRadius: 8,
+              padding: '13px',
+              fontWeight: 700,
+              fontSize: '1rem',
+              cursor: carregandoReserva ? 'not-allowed' : 'pointer',
+              opacity: carregandoReserva ? 0.7 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              transition: 'background-color 0.2s',
+            }}
+            onMouseEnter={e => { if (!carregandoReserva) (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#b07e1e'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = GOLD; }}
+          >
+            {carregandoReserva && (
+              <svg className="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="#fff" strokeWidth="4" strokeOpacity="0.25" />
+                <path d="M12 2a10 10 0 0 1 10 10" stroke="#fff" strokeWidth="4" strokeLinecap="round" />
+              </svg>
+            )}
+            Confirmar reserva
+          </button>
+        </form>
+      </div>
+    </Shell>
   );
 };
 
