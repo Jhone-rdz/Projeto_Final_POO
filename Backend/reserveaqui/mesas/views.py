@@ -39,7 +39,11 @@ class MesaViewSet(viewsets.ModelViewSet):
     
     def get_permissions(self):
         """Define permissões específicas por ação"""
-        if self.action in ['update', 'partial_update', 'destroy']:
+        if self.action in ['update', 'partial_update']:
+            # Funcionários podem alterar mesas do restaurante onde trabalham
+            return [IsAuthenticated(), IsFuncionarioOrHigher()]
+        elif self.action == 'destroy':
+            # Apenas admin pode deletar
             return [IsAuthenticated(), IsAdminOrProprietarioRestaurante()]
         return super().get_permissions()
     
@@ -49,7 +53,7 @@ class MesaViewSet(viewsets.ModelViewSet):
         - admin_sistema: Vê todas as mesas de todos os restaurantes
         - admin_secundario: Vê apenas mesas de seu restaurante
         - funcionario: Vê apenas mesas de seu restaurante (via RestauranteUsuario)
-        - cliente: Via query param restaurante_id apenas
+        - cliente: Sem acesso via list, mas pode filtrar por restaurante via query param
         """
         queryset = super().get_queryset()
         user = self.request.user
@@ -96,15 +100,7 @@ class MesaViewSet(viewsets.ModelViewSet):
                         queryset = queryset.filter(restaurante_id__in=restaurantes_ids)
                     else:
                         return queryset.none()
-                else:
-                    # Cliente: sem acesso direto via list
-                    # Vê apenas via query param restaurante_id
-                    return queryset.none()
-        
-        # Filtro por restaurante via query param (override)
-        restaurante_id = self.request.query_params.get('restaurante_id', None)
-        if restaurante_id:
-            queryset = queryset.filter(restaurante_id=restaurante_id)
+                # Cliente e outros: permitem filtro por restaurante via query param
         
         # Por padrão, mostra apenas mesas ativas
         mostrar_inativas = self.request.query_params.get('mostrar_inativas', 'false')
@@ -113,60 +109,67 @@ class MesaViewSet(viewsets.ModelViewSet):
         
         return queryset
     
-    @action(detail=False, methods=['get'], url_path='disponibilidade')
-    def disponibilidade(self, request):
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def verificar_disponibilidade(self, request):
         """
-        Consulta disponibilidade de mesas por data e horário.
+        Verifica disponibilidade de mesas para reserva (via POST).
         
-        Query params:
-        - restaurante_id (obrigatório): ID do restaurante
-        - data (obrigatório): Data no formato YYYY-MM-DD
+        Body:
+        - restaurante (obrigatório): ID do restaurante
+        - data_reserva (obrigatório): Data no formato YYYY-MM-DD
         - horario (obrigatório): Horário no formato HH:MM
         - quantidade_pessoas (opcional): Quantidade de pessoas
         
         Retorna mesas disponíveis que não possuem reservas confirmadas
         no horário especificado.
         """
-        restaurante_id = request.query_params.get('restaurante_id')
-        data_str = request.query_params.get('data')
-        horario_str = request.query_params.get('horario')
-        quantidade_pessoas = request.query_params.get('quantidade_pessoas')
+        restaurante_id = request.data.get('restaurante')
+        data_str = request.data.get('data_reserva')
+        horario_str = request.data.get('horario')
+        quantidade_pessoas = request.data.get('quantidade_pessoas')
         
         # Validações
         if not restaurante_id:
             return Response(
-                {"error": "O parâmetro 'restaurante_id' é obrigatório."},
+                {"error": "O campo 'restaurante' é obrigatório."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
         if not data_str:
             return Response(
-                {"error": "O parâmetro 'data' é obrigatório (formato: YYYY-MM-DD)."},
+                {"error": "O campo 'data_reserva' é obrigatório (formato: YYYY-MM-DD)."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
         if not horario_str:
             return Response(
-                {"error": "O parâmetro 'horario' é obrigatório (formato: HH:MM)."},
+                {"error": "O campo 'horario' é obrigatório (formato: HH:MM)."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
         try:
-            data_reserva = datetime.strptime(data_str, '%Y-%m-%d').date()
+            # Aceitar ambos os formatos: YYYY-MM-DD e DD/MM/YYYY
+            try:
+                data_reserva = datetime.strptime(data_str, '%Y-%m-%d').date()
+            except ValueError:
+                data_reserva = datetime.strptime(data_str, '%d/%m/%Y').date()
+            
             horario_reserva = datetime.strptime(horario_str, '%H:%M').time()
         except ValueError:
             return Response(
-                {"error": "Formato de data ou horário inválido. Use YYYY-MM-DD para data e HH:MM para horário."},
+                {"error": "Formato de data ou horário inválido. Use YYYY-MM-DD ou DD/MM/YYYY para data e HH:MM para horário."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Verificar se a data/horário não é no passado
+        # Verificar se a data/horário é no futuro (mínimo 30 minutos)
         data_hora_reserva = timezone.make_aware(
             datetime.combine(data_reserva, horario_reserva)
         )
-        if data_hora_reserva < timezone.now():
+        tempo_minimo = timezone.now() + timedelta(minutes=30)
+        
+        if data_hora_reserva < tempo_minimo:
             return Response(
-                {"error": "Não é possível consultar disponibilidade para datas/horários no passado."},
+                {"error": "A reserva deve ser no mínimo 30 minutos no futuro."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -219,8 +222,8 @@ class MesaViewSet(viewsets.ModelViewSet):
         serializer = MesaSerializer(mesas_disponiveis, many=True)
         
         return Response({
-            "restaurante_id": restaurante_id,
-            "data": data_str,
+            "restaurante": restaurante_id,
+            "data_reserva": data_str,
             "horario": horario_str,
             "total_mesas_disponiveis": mesas_disponiveis.count(),
             **info_adicional,

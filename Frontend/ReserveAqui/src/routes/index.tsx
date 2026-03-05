@@ -9,14 +9,11 @@ import Register from '../pages/Register';
 import RecuperarSenha from '../pages/RecuperarSenha';
 import ConfirmacaoRecuperacao from '../pages/ConfirmacaoRecuperacao';
 import RedefinirSenha from '../pages/RedefinirSenha';
-import Reservations from '../pages/Reservations';
-import Restaurants from '../pages/Restaurants';
 import RestauranteDetalhes from '../pages/RestauranteDetalhes';
 import Reserva from '../pages/Reserva';
 import Profile from '../pages/Profile';
 import StaffDashboard from '../pages/Staff/Dashboard';
 import OwnerDashboard from '../pages/Owner/Dashboard';
-import RestaurantProfile from '../pages/Owner/Restaurant';
 import AdminDashboard from '../pages/Admin/Dashboard';
 
 /**
@@ -50,22 +47,6 @@ export const router = createBrowserRouter([
   {
     path: '/redefinir-senha',
     element: <RedefinirSenha />,
-  },
-  {
-    path: '/reservations',
-    element: (
-      <ProtectedRoute requiredRoles={['cliente']}>
-        <Reservations />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/restaurants',
-    element: (
-      <PublicClienteRoute>
-        <Restaurants />
-      </PublicClienteRoute>
-    ),
   },
   {
     path: '/restaurantes/:id',
@@ -104,14 +85,6 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute requiredRoles={['admin_secundario']}>
         <OwnerDashboard />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: '/owner/restaurant',
-    element: (
-      <ProtectedRoute requiredRoles={['admin_secundario']}>
-        <RestaurantProfile />
       </ProtectedRoute>
     ),
   },

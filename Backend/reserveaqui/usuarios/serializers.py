@@ -62,11 +62,11 @@ class UsuarioSerializer(serializers.ModelSerializer):
     )
     password = serializers.CharField(
         write_only=True, 
-        required=True, 
+        required=False,
         style={'input_type': 'password'},
         validators=[validar_forca_senha]
     )
-    password_confirm = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
+    password_confirm = serializers.CharField(write_only=True, required=False, style={'input_type': 'password'})
 
     class Meta:
         model = Usuario
@@ -74,14 +74,18 @@ class UsuarioSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'date_joined')
 
     def validate(self, data):
-        """Validar se as senhas batem"""
-        if data['password'] != data['password_confirm']:
-            raise serializers.ValidationError({'password': 'As senhas não correspondem.'})
+        """Validar se as senhas batem - apenas se password foi fornecido"""
+        if 'password' in data or 'password_confirm' in data:
+            # Se um foi fornecido, ambos devem estar presentes
+            if 'password' not in data or 'password_confirm' not in data:
+                raise serializers.ValidationError({'password': 'Ambas as senhas devem ser fornecidas.'})
+            if data['password'] != data['password_confirm']:
+                raise serializers.ValidationError({'password': 'As senhas não correspondem.'})
         return data
 
     def create(self, validated_data):
         """Criar novo usuário com a senha e papéis"""
-        validated_data.pop('password_confirm')
+        validated_data.pop('password_confirm', None)
         password = validated_data.pop('password')
         papeis = validated_data.pop('papeis', [])
         
@@ -96,6 +100,27 @@ class UsuarioSerializer(serializers.ModelSerializer):
             usuario.papeis.add(papel)
         
         return usuario
+
+    def update(self, instance, validated_data):
+        """Atualizar usuário - processa senha se fornecida"""
+        validated_data.pop('password_confirm', None)
+        
+        # Se password foi fornecido, atualiza a senha
+        if 'password' in validated_data:
+            password = validated_data.pop('password')
+            instance.set_password(password)
+        
+        # Atualizar papéis se fornecido
+        if 'papeis' in validated_data:
+            papeis = validated_data.pop('papeis')
+            instance.papeis.set(papeis)
+        
+        # Atualizar outros campos
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        
+        instance.save()
+        return instance
 
 
 class LoginSerializer(serializers.Serializer):

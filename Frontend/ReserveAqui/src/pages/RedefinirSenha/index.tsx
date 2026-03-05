@@ -11,7 +11,7 @@ interface FormErrors {
 }
 
 /**
- * Página de Redefinição de Senha — tema ReservaFácil
+ * Página de Redefinição de Senha — tema ReserveAqui
  */
 export default function RedefinirSenha() {
   const navigate = useNavigate();
@@ -96,7 +96,7 @@ export default function RedefinirSenha() {
               <rect x="18" y="2" width="3" height="5" rx="1.5" fill={GOLD} />
               <path d="M8 16l3 3 6-6" stroke={GOLD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            <span style={{ color: GOLD, fontWeight: 700, fontSize: '1.2rem', fontFamily: "'Georgia', serif" }}>ReservaFácil</span>
+            <span style={{ color: GOLD, fontWeight: 700, fontSize: '1.2rem', fontFamily: "'Georgia', serif" }}>ReserveAqui</span>
           </Link>
           <div className="flex items-center gap-2">
             <Link to="/login"><button style={{ background: 'none', border: `1px solid ${GOLD}`, color: GOLD, borderRadius: 8, padding: '7px 22px', fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer' }}>Entrar</button></Link>
@@ -110,7 +110,7 @@ export default function RedefinirSenha() {
       </main>
 
       <footer className="py-6 text-center">
-        <p style={{ color: '#555', fontSize: '0.85rem', fontWeight: 600 }}>© 2026 ReservaFácil. Todos os direitos reservados.</p>
+        <p style={{ color: '#555', fontSize: '0.85rem', fontWeight: 600 }}>© 2026 ReserveAqui. Todos os direitos reservados.</p>
       </footer>
     </div>
   );

@@ -6,7 +6,7 @@ import { notificacoesService } from '../../services/api';
 import type { Notificacao } from '../../types';
 
 /**
- * Componente de Header/Navbar — tema escuro ReservaFácil
+ * Componente de Header/Navbar — tema escuro ReserveAqui
  */
 export const Header = () => {
   const { isAuthenticated, usuario, logout } = useAuth();
@@ -160,7 +160,7 @@ export const Header = () => {
                 letterSpacing: '0.01em',
               }}
             >
-              ReservaFácil
+              ReserveAqui
             </span>
           </Link>
 
@@ -176,19 +176,12 @@ export const Header = () => {
                 >
                   Inicio
                 </Link>
-                <Link
-                  to="/restaurants"
-                  style={{ color: '#ccc', fontWeight: 500, textDecoration: 'none', fontSize: '0.95rem' }}
-                  onMouseEnter={e => (e.currentTarget.style.color = GOLD)}
-                  onMouseLeave={e => (e.currentTarget.style.color = '#ccc')}
-                >
-                  Restaurantes
-                </Link>
+
               </>
             )}
             {isAuthenticated && isCliente && !isPainelInterno && (
               <Link
-                to="/reservations"
+                to="/profile"
                 style={{ color: '#ccc', fontWeight: 500, textDecoration: 'none', fontSize: '0.95rem' }}
                 onMouseEnter={e => (e.currentTarget.style.color = GOLD)}
                 onMouseLeave={e => (e.currentTarget.style.color = '#ccc')}
@@ -324,16 +317,7 @@ export const Header = () => {
                       >👔 Dashboard Funcionário</Link>
                     )}
                     {usuario.papeis?.some(p => p.tipo === 'admin_secundario') && (
-                      <>
-                        <Link to="/owner/dashboard" onClick={() => setPerfilAberto(false)}
-                          className="block px-4 py-2 text-sm font-medium"
-                          style={{ color: '#ddd', textDecoration: 'none' }}
-                        >🏪 Dashboard</Link>
-                        <Link to="/owner/restaurant" onClick={() => setPerfilAberto(false)}
-                          className="block px-4 py-2 text-sm font-medium"
-                          style={{ color: '#ddd', textDecoration: 'none' }}
-                        >⚙️ Gerenciar Restaurante</Link>
-                      </>
+                      <></>
                     )}
                     {usuario.papeis?.some(p => p.tipo === 'admin_sistema') && (
                       <Link to="/admin/dashboard" onClick={() => setPerfilAberto(false)}
@@ -341,10 +325,6 @@ export const Header = () => {
                         style={{ color: '#ddd', textDecoration: 'none' }}
                       >🔧 Dashboard Admin</Link>
                     )}
-                    <Link to="/profile" onClick={() => setPerfilAberto(false)}
-                      className="block px-4 py-2 text-sm font-medium"
-                      style={{ color: '#ddd', textDecoration: 'none' }}
-                    >👤 Meu Perfil</Link>
                     <button
                       onClick={() => { logout(); setPerfilAberto(false); }}
                       className="w-full text-left px-4 py-2 text-sm font-medium"
@@ -415,11 +395,10 @@ export const Header = () => {
             {!isPainelInterno && (
               <>
                 <Link to="/" className="block px-4 py-2 font-medium" style={{ color: '#ccc', textDecoration: 'none' }}>Home</Link>
-                <Link to="/restaurants" className="block px-4 py-2 font-medium" style={{ color: '#ccc', textDecoration: 'none' }}>Restaurantes</Link>
               </>
             )}
             {isAuthenticated && isCliente && !isPainelInterno && (
-              <Link to="/reservations" className="block px-4 py-2 font-medium" style={{ color: '#ccc', textDecoration: 'none' }}>Minhas Reservas</Link>
+              <Link to="/profile" className="block px-4 py-2 font-medium" style={{ color: '#ccc', textDecoration: 'none' }}>Minhas Reservas</Link>
             )}
             {!isAuthenticated && (
               <div className="flex gap-2 px-4 pt-3">

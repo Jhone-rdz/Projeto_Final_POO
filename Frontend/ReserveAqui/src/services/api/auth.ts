@@ -36,7 +36,7 @@ export const authService = {
     const response = await api.post('/usuarios/trocar_senha/', {
       senha_atual: senhaAtual,
       nova_senha: novaSenha,
-      confirmacao_senha: novaSenha,
+      nova_senha_confirm: novaSenha,
     });
     return response.data;
   },

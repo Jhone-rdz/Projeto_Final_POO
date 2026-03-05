@@ -6,7 +6,7 @@ import { Input, Button, Alert } from '../../components/common';
 const GOLD = '#C9922A';
 
 /**
- * Página de Login — tema ReservaFácil
+ * Página de Login — tema ReserveAqui
  */
 export default function Login() {
   const navigate = useNavigate();
@@ -80,7 +80,7 @@ export default function Login() {
               <path d="M8 16l3 3 6-6" stroke={GOLD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             <span style={{ color: GOLD, fontWeight: 700, fontSize: '1.2rem', fontFamily: "'Georgia', serif" }}>
-              ReservaFácil
+              ReserveAqui
             </span>
           </Link>
 
@@ -248,7 +248,7 @@ export default function Login() {
       {/* Footer */}
       <footer className="py-6 text-center">
         <p style={{ color: '#555', fontSize: '0.85rem', fontWeight: 600 }}>
-          © 2026 ReservaFácil. Todos os direitos reservados.
+          © 2026 ReserveAqui. Todos os direitos reservados.
         </p>
       </footer>
     </div>

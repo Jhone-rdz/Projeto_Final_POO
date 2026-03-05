@@ -1,719 +1,372 @@
 import { useAuth } from '../../context';
 import { Header, Footer } from '../../components/layout';
 import { useEffect, useState, useCallback } from 'react';
-import { Input, Button, Alert } from '../../components/common';
 import { reservasService, restaurantesService } from '../../services/api';
 import type { Reserva, Restaurante } from '../../types';
 
+const GOLD = '#C9922A';
+const BG = '#fff';
+const BEGE = '#f5f0ea';
+
 /**
- * Página de Perfil do Usuário - Gerenciar dados e reservas
+ * Página de Perfil — tema ReservaFácil (todos os perfis)
  */
 const Profile = () => {
-  const { usuario, trocarSenha, logout } = useAuth();
-  
-  // Estado de abas
-  const [abaAtiva, setAbaAtiva] = useState<'dados' | 'reservas'>('dados');
-  
-  // Estado de modo de dados
+  const { usuario, trocarSenha, atualizarDados } = useAuth();
+
   const [modoEdicaoDados, setModoEdicaoDados] = useState(false);
-  const [formDados, setFormDados] = useState({
-    nome: usuario?.nome || '',
-    email: usuario?.email || '',
-  });
-  
-  // Estado de senha
+  const [formDados, setFormDados] = useState({ nome: usuario?.nome || '', email: usuario?.email || '' });
   const [modalSenha, setModalSenha] = useState(false);
-  const [senhaData, setSenhaData] = useState({
-    senhaAtual: '',
-    novaSenha: '',
-    confirmarSenha: '',
-  });
-  
-  // Estado de reservas
+  const [senhaData, setSenhaData] = useState({ senhaAtual: '', novaSenha: '', confirmarSenha: '' });
   const [reservas, setReservas] = useState<Reserva[]>([]);
   const [restaurantesMap, setRestaurantesMap] = useState<Record<number, Restaurante>>({});
   const [carregandoReservas, setCarregandoReservas] = useState(false);
-  
-  // Estado de modal de edição de reserva
-  const [modalEdicaoReserva, setModalEdicaoReserva] = useState(false);
-  const [reservaEdicao, setReservaEdicao] = useState<Reserva | null>(null);
-  const [formReserva, setFormReserva] = useState({
-    data_reserva: '',
-    horario: '',
-    quantidade_pessoas: '',
-  });
-  
-  // Estado de modal de cancelamento
   const [modalCancelamento, setModalCancelamento] = useState(false);
   const [reservaCancelamento, setReservaCancelamento] = useState<Reserva | null>(null);
   const [motivoCancelamento, setMotivoCancelamento] = useState('');
-  
-  // Feedbacks
+  const [modalEdicaoReserva, setModalEdicaoReserva] = useState(false);
+  const [reservaEdicao, setReservaEdicao] = useState<Reserva | null>(null);
+  const [formReserva, setFormReserva] = useState({ data_reserva: '', horario: '', quantidade_pessoas: '' });
   const [erro, setErro] = useState('');
   const [sucesso, setSuccesso] = useState('');
   const [carregando, setCarregando] = useState(false);
 
-  // Carregar minhas reservas e dados dos restaurantes
+  // Estilos comuns
+  const inputStyle: React.CSSProperties = {
+    width: '100%', backgroundColor: BEGE, border: '1px solid #e0d8ce',
+    borderRadius: 8, padding: '10px 14px', color: '#1a1a1a',
+    fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box',
+  };
+  const labelStyle: React.CSSProperties = { display: 'block', color: '#1a1a1a', fontWeight: 600, fontSize: '0.9rem', marginBottom: 6 };
+  const btnGold: React.CSSProperties = { backgroundColor: GOLD, border: 'none', color: '#fff', borderRadius: 8, padding: '9px 22px', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer' };
+  const btnOutline: React.CSSProperties = { backgroundColor: 'transparent', border: '1.5px solid #ccc', color: '#555', borderRadius: 8, padding: '8px 18px', fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer' };
+
   const carregarReservas = useCallback(async () => {
     try {
       setCarregandoReservas(true);
       const response = await reservasService.minhasReservas();
-      setReservas(response.results || []);
-
-      // Carregar dados dos restaurantes
-      const restauranteIds = Array.from(
-        new Set((response.results || []).map((r) => r.restaurante))
-      );
+      console.log('Resposta de minhasReservas:', response);
+      
+      // Aceitar tanto formato paginado quanto array direto
+      const reservasData = Array.isArray(response) ? response : (response.results || []);
+      setReservas(reservasData);
+      
+      const ids = Array.from(new Set(reservasData.map((r: Reserva) => r.restaurante)));
       const mapa: Record<number, Restaurante> = {};
-
-      for (const id of restauranteIds) {
-        try {
-          const restaurante = await restaurantesService.obter(id);
-          mapa[id] = restaurante;
-        } catch {
-          // Ignorar erro individual de restaurante
-        }
+      for (const id of ids) {
+        try { mapa[id as number] = await restaurantesService.obter(id as number); } catch {}
       }
-
       setRestaurantesMap(mapa);
-    } catch {
-      setErro('Erro ao carregar suas reservas');
-    } finally {
-      setCarregandoReservas(false);
+    } catch (error) { 
+      console.error('Erro ao carregar reservas:', error);
+      setErro('Erro ao carregar reservas'); 
     }
+    finally { setCarregandoReservas(false); }
   }, []);
 
-  // Carregar reservas ao entrar na aba de reservas
-  useEffect(() => {
-    if (abaAtiva === 'reservas') {
-      carregarReservas();
-    }
-  }, [abaAtiva, carregarReservas]);
+  useEffect(() => { carregarReservas(); }, [carregarReservas]);
 
-  // Alternar modo de edição de dados
-  const handleEditarDados = () => {
-    if (modoEdicaoDados) {
-      setFormDados({
-        nome: usuario?.nome || '',
-        email: usuario?.email || '',
-      });
-    }
-    setModoEdicaoDados(!modoEdicaoDados);
-  };
-
-  // Salvar dados do cliente
   const handleSalvarDados = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErro('');
-    setSuccesso('');
-
-    if (!formDados.nome.trim()) {
-      setErro('Nome é obrigatório');
-      return;
-    }
-
-    if (!formDados.email.trim() || !formDados.email.includes('@')) {
-      setErro('Email é obrigatório e deve ser válido');
-      return;
-    }
-
+    setErro(''); setSuccesso('');
+    if (!formDados.nome.trim()) { setErro('Nome é obrigatório'); return; }
     try {
       setCarregando(true);
-      // TODO: Implementar chamada para atualizar dados no backend
-      setSuccesso('Dados atualizados com sucesso!');
+      await atualizarDados(formDados);
+      setSuccesso('Dados atualizados!');
       setModoEdicaoDados(false);
       setTimeout(() => setSuccesso(''), 3000);
-    } catch {
-      setErro('Erro ao atualizar dados');
-    } finally {
-      setCarregando(false);
-    }
+    } catch { setErro('Erro ao atualizar dados'); }
+    finally { setCarregando(false); }
   };
 
-  // Alterar senha
   const handleMudancaSenha = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErro('');
-    setSuccesso('');
-
-    if (!senhaData.senhaAtual) {
-      setErro('Informe a senha atual');
-      return;
-    }
-
-    if (senhaData.novaSenha.length < 6) {
-      setErro('Senha deve ter no mínimo 6 caracteres');
-      return;
-    }
-
-    if (senhaData.novaSenha !== senhaData.confirmarSenha) {
-      setErro('As senhas não conferem');
-      return;
-    }
-
+    setErro(''); setSuccesso('');
+    if (!senhaData.senhaAtual) { setErro('Informe a senha atual'); return; }
+    if (senhaData.novaSenha.length < 6) { setErro('Senha deve ter mínimo 6 caracteres'); return; }
+    if (senhaData.novaSenha !== senhaData.confirmarSenha) { setErro('As senhas não conferem'); return; }
     try {
       setCarregando(true);
       await trocarSenha(senhaData.senhaAtual, senhaData.novaSenha);
-      setSuccesso('Senha alterada com sucesso!');
-      setSenhaData({
-        senhaAtual: '',
-        novaSenha: '',
-        confirmarSenha: '',
-      });
+      setSuccesso('Senha alterada!');
+      setSenhaData({ senhaAtual: '', novaSenha: '', confirmarSenha: '' });
       setModalSenha(false);
       setTimeout(() => setSuccesso(''), 3000);
-    } catch {
-      setErro('Erro ao alterar senha. Verifique sua senha atual.');
-    } finally {
-      setCarregando(false);
+    } catch { setErro('Senha atual incorreta'); }
+    finally { setCarregando(false); }
+  };
+
+  const handleConfirmarCancelamento = async () => {
+    if (!reservaCancelamento) return;
+    try {
+      setCarregando(true);
+      await reservasService.cancelar(reservaCancelamento.id, motivoCancelamento);
+      setSuccesso('Reserva cancelada!');
+      setModalCancelamento(false);
+      setReservaCancelamento(null);
+      setMotivoCancelamento('');
+      carregarReservas();
+      setTimeout(() => setSuccesso(''), 3000);
+    } catch (error: any) { 
+      const mensagemErro = error.response?.data?.error || 'Erro ao cancelar reserva';
+      setErro(mensagemErro);
+      setModalCancelamento(false);
     }
+    finally { setCarregando(false); }
   };
 
-  // Abrir modal de edição de reserva
-  const handleAbrirEdicaoReserva = (reserva: Reserva) => {
-    setReservaEdicao(reserva);
-    setFormReserva({
-      data_reserva: reserva.data_reserva,
-      horario: reserva.horario,
-      quantidade_pessoas: String(reserva.quantidade_pessoas),
-    });
-    setModalEdicaoReserva(true);
-  };
-
-  // Salvar edição de reserva
   const handleSalvarReserva = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErro('');
-    setSuccesso('');
-
     if (!reservaEdicao) return;
-
-    if (!formReserva.data_reserva || !formReserva.horario || !formReserva.quantidade_pessoas) {
-      setErro('Preencha todos os campos');
-      return;
-    }
-
-    const quantidade = parseInt(formReserva.quantidade_pessoas);
-    if (quantidade < 1 || quantidade > 20) {
-      setErro('Quantidade deve estar entre 1 e 20 pessoas');
-      return;
-    }
-
     try {
       setCarregando(true);
       await reservasService.atualizar(reservaEdicao.id, {
         data_reserva: formReserva.data_reserva,
         horario: formReserva.horario,
-        quantidade_pessoas: quantidade,
+        quantidade_pessoas: parseInt(formReserva.quantidade_pessoas),
       });
-      setSuccesso('Reserva editada com sucesso!');
+      setSuccesso('Reserva editada!');
       setModalEdicaoReserva(false);
       carregarReservas();
       setTimeout(() => setSuccesso(''), 3000);
-    } catch {
-      setErro('Erro ao editar reserva');
-    } finally {
-      setCarregando(false);
-    }
+    } catch { setErro('Erro ao editar reserva'); }
+    finally { setCarregando(false); }
   };
 
-  // Abrir modal de cancelamento
-  const handleAbrirCancelamento = (reserva: Reserva) => {
-    setReservaCancelamento(reserva);
-    setMotivoCancelamento('');
-    setModalCancelamento(true);
-  };
+  const obterNomeRestaurante = (id: number) => restaurantesMap[id]?.nome || `Restaurante #${id}`;
+  const formatarData = (data: string) => new Date(data + 'T00:00:00').toLocaleDateString('pt-BR');
 
-  // Confirmar cancelamento de reserva
-  const handleConfirmarCancelamento = async () => {
-    setErro('');
-    setSuccesso('');
-
-    if (!reservaCancelamento) return;
-
-    try {
-      setCarregando(true);
-      await reservasService.cancelar(reservaCancelamento.id, motivoCancelamento);
-      setSuccesso('Reserva cancelada com sucesso!');
-      setModalCancelamento(false);
-      carregarReservas();
-      setTimeout(() => setSuccesso(''), 3000);
-    } catch {
-      setErro('Erro ao cancelar reserva');
-    } finally {
-      setCarregando(false);
-    }
-  };
-
-  // Formatar data para display
-  const formatarData = (data: string) => {
-    return new Date(data + 'T00:00:00').toLocaleDateString('pt-BR');
-  };
-
-  // Obter cor do status
-  const corStatus = (status: string) => {
+  const statusStyle = (status: string): React.CSSProperties => {
     switch (status) {
-      case 'confirmada':
-        return 'bg-green-100 text-green-800';
-      case 'cancelada':
-        return 'bg-red-100 text-red-800';
-      case 'concluida':
-        return 'bg-gray-100 text-gray-800';
-      case 'pendente':
-        return 'bg-blue-100 text-blue-800';
-      default:
-        return 'bg-blue-100 text-blue-800';
+      case 'confirmada': case 'ativa': return { backgroundColor: GOLD, color: '#fff' };
+      case 'pendente':   return { backgroundColor: 'transparent', border: '1.5px solid #ccc', color: '#888' };
+      case 'cancelada':  return { backgroundColor: '#e05555', color: '#fff' };
+      case 'concluida':  return { backgroundColor: 'transparent', border: '1.5px solid #ccc', color: '#888' };
+      default:           return { backgroundColor: '#eee', color: '#666' };
     }
   };
 
-  // Obter texto do status
   const textoStatus = (status: string) => {
     switch (status) {
-      case 'confirmada':
-        return 'Confirmada';
-      case 'cancelada':
-        return 'Cancelada';
-      case 'concluida':
-        return 'Concluída';
-      case 'pendente':
-        return 'Pendente';
-      default:
-        return status;
+      case 'confirmada': return 'Ativa';
+      case 'pendente':   return 'Pendente';
+      case 'cancelada':  return 'Cancelada';
+      case 'concluida':  return 'Concluída';
+      default: return status;
     }
-  };
-
-  // Obter nome do restaurante
-  const obterNomeRestaurante = (restauranteId: number) => {
-    return restaurantesMap[restauranteId]?.nome || 'Restaurante';
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className="w-full flex flex-col min-h-screen" style={{ backgroundColor: BG }}>
       <Header />
 
-      <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 w-full">
+      <main className="w-full flex-1 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+
         {/* Título */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900">Meu Perfil</h1>
-          <p className="text-gray-600 mt-2">Gerencie suas informações pessoais e reservas</p>
-        </div>
+        <h1 style={{ fontSize: '2rem', fontWeight: 700, color: '#1a1a1a', marginBottom: 24 }}>Meu perfil</h1>
 
-        {/* Alertas */}
-        {erro && <Alert type="error" message={erro} onClose={() => setErro('')} />}
-        {sucesso && <Alert type="success" message={sucesso} onClose={() => setSuccesso('')} />}
-
-        {/* Abas */}
-        <div className="flex gap-4 mb-8 border-b border-gray-200">
-          <button
-            onClick={() => setAbaAtiva('dados')}
-            className={`px-6 py-3 font-medium border-b-2 transition-colors text-lg ${
-              abaAtiva === 'dados'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            👤 Dados Pessoais
-          </button>
-          <button
-            onClick={() => setAbaAtiva('reservas')}
-            className={`px-6 py-3 font-medium border-b-2 transition-colors text-lg ${
-              abaAtiva === 'reservas'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            📅 Minhas Reservas
-          </button>
-        </div>
-
-        {/* SEÇÃO: DADOS PESSOAIS */}
-        {abaAtiva === 'dados' && usuario && (
-          <div className="space-y-6">
-            {/* Dados do Cliente */}
-            <div className="bg-white rounded-lg shadow-md p-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Dados Pessoais</h2>
-
-              {!modoEdicaoDados ? (
-                // Modo Visualização
-                <div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        👤 Nome
-                      </label>
-                      <p className="text-lg text-gray-900 bg-gray-50 p-4 rounded-lg">
-                        {usuario.nome}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        ✉️ Email
-                      </label>
-                      <p className="text-lg text-gray-900 bg-gray-50 p-4 rounded-lg">
-                        {usuario.email}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-3">
-                    <Button
-                      variant="secondary"
-                      size="md"
-                      onClick={handleEditarDados}
-                    >
-                      ✏️ Editar Dados
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="md"
-                      onClick={() => setModalSenha(true)}
-                    >
-                      🔐 Alterar Senha
-                    </Button>
-                    <Button
-                      variant="danger"
-                      size="md"
-                      onClick={() => logout()}
-                    >
-                      🚪 Sair da Conta
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                // Modo Edição Inline
-                <form onSubmit={handleSalvarDados} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Input
-                      label="Nome"
-                      value={formDados.nome}
-                      onChange={(e) => setFormDados({ ...formDados, nome: e.target.value })}
-                      disabled={carregando}
-                    />
-                    <Input
-                      label="Email"
-                      type="email"
-                      value={formDados.email}
-                      onChange={(e) => setFormDados({ ...formDados, email: e.target.value })}
-                      disabled={carregando}
-                    />
-                  </div>
-
-                  <div className="flex gap-3">
-                    <Button
-                      variant="secondary"
-                      size="md"
-                      onClick={handleEditarDados}
-                      disabled={carregando}
-                    >
-                      ❌ Cancelar
-                    </Button>
-                    <Button
-                      variant="primary"
-                      size="md"
-                      isLoading={carregando}
-                      type="submit"
-                    >
-                      ✅ Salvar
-                    </Button>
-                  </div>
-                </form>
-              )}
-            </div>
+        {/* Feedback */}
+        {erro && (
+          <div style={{ backgroundColor: '#6b1a1a', border: '1px solid #9b2c2c', borderRadius: 8, padding: '12px 16px', marginBottom: 16, color: '#fff', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontWeight: 600, fontSize: '0.9rem', flex: 1 }}>{erro}</span>
+            <button onClick={() => setErro('')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>✕</button>
+          </div>
+        )}
+        {sucesso && (
+          <div style={{ backgroundColor: '#1e4d2b', borderRadius: 8, padding: '12px 16px', marginBottom: 16, color: '#fff', fontWeight: 600, fontSize: '0.9rem' }}>
+            ✅ {sucesso}
           </div>
         )}
 
-        {/* SEÇÃO: MINHAS RESERVAS */}
-        {abaAtiva === 'reservas' && (
-          <div>
-            <div className="bg-white rounded-lg shadow-md p-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Minhas Reservas</h2>
+        {/* ── Card: Dados Pessoais ── */}
+        <div style={{ backgroundColor: BG, borderRadius: 14, border: '1px solid #e5ddd5', padding: '24px 28px', marginBottom: 20, boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
 
-              {carregandoReservas ? (
-                <div className="text-center py-12">
-                  <p className="text-gray-600">Carregando reservas...</p>
-                </div>
-              ) : reservas.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-gray-600 text-lg mb-4">Você não tem reservas ainda</p>
-                  <Button variant="primary" size="md" onClick={() => window.location.href = '/restaurants'}>
-                    🍽️ Explorar Restaurantes
-                  </Button>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b-2 border-gray-200">
-                        <th className="text-left py-4 px-4 font-semibold text-gray-900">
-                          🏢 Restaurante
-                        </th>
-                        <th className="text-left py-4 px-4 font-semibold text-gray-900">
-                          📅 Data
-                        </th>
-                        <th className="text-left py-4 px-4 font-semibold text-gray-900">
-                          🕐 Horário
-                        </th>
-                        <th className="text-left py-4 px-4 font-semibold text-gray-900">
-                          👥 Pessoas
-                        </th>
-                        <th className="text-left py-4 px-4 font-semibold text-gray-900">
-                          📊 Status
-                        </th>
-                        <th className="text-left py-4 px-4 font-semibold text-gray-900">
-                          ⚙️ Ações
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {reservas.map((reserva) => (
-                        <tr
-                          key={reserva.id}
-                          className="border-b border-gray-200 hover:bg-gray-50 transition-colors"
+          {/* Cabeçalho */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <h2 style={{ fontWeight: 700, fontSize: '1.1rem', color: '#1a1a1a', margin: 0 }}>
+              {modoEdicaoDados ? 'Dados Pessoais' : 'Dados pessoais'}
+            </h2>
+            {modoEdicaoDados ? (
+              <button
+                onClick={() => { setModoEdicaoDados(false); setFormDados({ nome: usuario?.nome || '', email: usuario?.email || '' }); }}
+                style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.9rem', fontWeight: 500 }}
+              >
+                ✏️ Cancelar
+              </button>
+            ) : (
+              <button onClick={() => setModoEdicaoDados(true)} style={btnGold}>
+                Editar perfil
+              </button>
+            )}
+          </div>
+
+          {modoEdicaoDados ? (
+            /* Modo edição */
+            <form onSubmit={handleSalvarDados}>
+              <div style={{ marginBottom: 14 }}>
+                <label style={labelStyle}>Nome</label>
+                <input value={formDados.nome} onChange={e => setFormDados({ ...formDados, nome: e.target.value })} style={inputStyle} disabled={carregando}
+                  onFocus={e => (e.currentTarget.style.borderColor = GOLD)} onBlur={e => (e.currentTarget.style.borderColor = '#e0d8ce')} />
+              </div>
+              <div style={{ marginBottom: 18 }}>
+                <label style={labelStyle}>Email</label>
+                <input type="email" value={formDados.email} onChange={e => setFormDados({ ...formDados, email: e.target.value })} style={inputStyle} disabled={carregando}
+                  onFocus={e => (e.currentTarget.style.borderColor = GOLD)} onBlur={e => (e.currentTarget.style.borderColor = '#e0d8ce')} />
+              </div>
+              <button type="submit" disabled={carregando} style={btnGold}>Salvar</button>
+              <div style={{ marginTop: 12 }}>
+                <button type="button" onClick={() => setModalSenha(true)} style={btnOutline}>Alterar Senha</button>
+              </div>
+            </form>
+          ) : (
+            /* Modo visualização */
+            <div>
+              <p style={{ color: '#555', fontSize: '0.95rem', marginBottom: 6 }}>
+                Nome: <strong style={{ color: '#1a1a1a' }}>{usuario?.nome}</strong>
+              </p>
+              <p style={{ color: '#555', fontSize: '0.95rem', marginBottom: 16 }}>
+                Email: <strong style={{ color: '#1a1a1a' }}>{usuario?.email}</strong>
+              </p>
+              <button onClick={() => setModalSenha(true)} style={btnOutline}>Alterar senha</button>
+            </div>
+          )}
+        </div>
+
+        {/* ── Card: Minhas Reservas ── */}
+        <div style={{ backgroundColor: BG, borderRadius: 14, border: '1px solid #e5ddd5', padding: '24px 28px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+          <h2 style={{ fontWeight: 700, fontSize: '1.1rem', color: '#1a1a1a', marginBottom: 18 }}>Minhas reservas</h2>
+
+          {carregandoReservas ? (
+            <div className="flex justify-center py-10">
+              <div className="animate-spin rounded-full" style={{ width: 36, height: 36, border: '4px solid #e5d9c8', borderTopColor: GOLD }} />
+            </div>
+          ) : reservas.length === 0 ? (
+            <p style={{ color: '#888', textAlign: 'center', padding: '32px 0' }}>Nenhuma reserva encontrada</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {reservas.map(reserva => (
+                <div key={reserva.id} style={{ border: '1px solid #e5ddd5', borderRadius: 10, padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontWeight: 700, color: '#1a1a1a', fontSize: '0.95rem', marginBottom: 3 }}>
+                      {obterNomeRestaurante(reserva.restaurante)}
+                    </p>
+                    <p style={{ color: '#888', fontSize: '0.82rem' }}>
+                      {reserva.data_reserva} às {reserva.horario} • {reserva.quantidade_pessoas} pessoa(s)
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                    <span style={{ ...statusStyle(reserva.status), borderRadius: 7, padding: '4px 12px', fontSize: '0.78rem', fontWeight: 700 }}>
+                      {textoStatus(reserva.status)}
+                    </span>
+                    {(reserva.status === 'confirmada' || reserva.status === 'pendente') && (() => {
+                      const dataReserva = new Date(reserva.data_reserva + 'T' + reserva.horario);
+                      const podeCancel = dataReserva > new Date();
+                      return (
+                        <button
+                          onClick={() => { setReservaCancelamento(reserva); setMotivoCancelamento(''); setModalCancelamento(true); }}
+                          disabled={!podeCancel}
+                          style={{ backgroundColor: 'transparent', border: '1.5px solid #ccc', color: podeCancel ? '#888' : '#ddd', borderRadius: 7, padding: '4px 12px', fontWeight: 600, fontSize: '0.78rem', cursor: podeCancel ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: 4, opacity: podeCancel ? 1 : 0.5 }}
                         >
-                          <td className="py-4 px-4">
-                            <p className="font-medium text-gray-900">
-                              {obterNomeRestaurante(reserva.restaurante)}
-                            </p>
-                          </td>
-                          <td className="py-4 px-4 text-gray-700">
-                            {formatarData(reserva.data_reserva)}
-                          </td>
-                          <td className="py-4 px-4 text-gray-700">{reserva.horario}</td>
-                          <td className="py-4 px-4 text-gray-700">{reserva.quantidade_pessoas}</td>
-                          <td className="py-4 px-4">
-                            <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${corStatus(reserva.status)}`}>
-                              {textoStatus(reserva.status)}
-                            </span>
-                          </td>
-                          <td className="py-4 px-4">
-                            <div className="flex gap-2">
-                              {(reserva.status === 'confirmada' || reserva.status === 'pendente') && (
-                                <>
-                                  <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={() => handleAbrirEdicaoReserva(reserva)}
-                                  >
-                                    ✏️ Editar
-                                  </Button>
-                                  <Button
-                                    variant="danger"
-                                    size="sm"
-                                    onClick={() => handleAbrirCancelamento(reserva)}
-                                  >
-                                    ❌ Cancelar
-                                  </Button>
-                                </>
-                              )}
-                              {(reserva.status === 'cancelada' || reserva.status === 'concluida') && (
-                                <span className="text-gray-500 text-sm">Sem ações</span>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                          ✕ Cancelar
+                        </button>
+                      );
+                    })()}
+                  </div>
                 </div>
-              )}
+              ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </main>
 
-      {/* MODAL: Alterar Senha */}
+      {/* ── MODAL: Alterar Senha ── */}
       {modalSenha && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">🔐 Alterar Senha</h2>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
+          <div style={{ backgroundColor: BEGE, borderRadius: 14, padding: '28px 32px', maxWidth: 440, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.2)', position: 'relative' }}>
+            {/* Fechar */}
+            <button onClick={() => { setModalSenha(false); setSenhaData({ senhaAtual: '', novaSenha: '', confirmarSenha: '' }); setErro(''); }}
+              style={{ position: 'absolute', top: 14, right: 16, background: 'none', border: 'none', fontSize: '1.1rem', cursor: 'pointer', color: '#888' }}>✕</button>
 
-            <form onSubmit={handleMudancaSenha} className="space-y-4">
-              <Input
-                type="password"
-                label="Senha Atual"
-                placeholder="Digite sua senha atual"
-                value={senhaData.senhaAtual}
-                onChange={(e) =>
-                  setSenhaData({ ...senhaData, senhaAtual: e.target.value })
-                }
-                disabled={carregando}
-              />
+            <h2 style={{ fontWeight: 700, fontSize: '1.2rem', color: '#1a1a1a', marginBottom: 20 }}>Alterar Senha</h2>
 
-              <Input
-                type="password"
-                label="Nova Senha"
-                placeholder="Digite sua nova senha"
-                value={senhaData.novaSenha}
-                onChange={(e) =>
-                  setSenhaData({ ...senhaData, novaSenha: e.target.value })
-                }
-                disabled={carregando}
-                helperText="Mínimo 6 caracteres"
-              />
+            <form onSubmit={handleMudancaSenha}>
+              {['senhaAtual', 'novaSenha', 'confirmarSenha'].map((campo, i) => {
+                const labels = ['Senha Atual', 'Nova Senha', 'Confirmar Nova Senha'];
+                return (
+                  <div key={campo} style={{ marginBottom: 14 }}>
+                    <label style={labelStyle}>{labels[i]}</label>
+                    <input
+                      type="password"
+                      value={senhaData[campo as keyof typeof senhaData]}
+                      onChange={e => setSenhaData({ ...senhaData, [campo]: e.target.value })}
+                      disabled={carregando}
+                      style={inputStyle}
+                      onFocus={e => (e.currentTarget.style.borderColor = GOLD)}
+                      onBlur={e => (e.currentTarget.style.borderColor = '#e0d8ce')}
+                    />
+                  </div>
+                );
+              })}
 
-              <Input
-                type="password"
-                label="Confirmar Senha"
-                placeholder="Confirme sua nova senha"
-                value={senhaData.confirmarSenha}
-                onChange={(e) =>
-                  setSenhaData({ ...senhaData, confirmarSenha: e.target.value })
-                }
-                disabled={carregando}
-              />
-
-              <div className="flex gap-3 pt-4">
-                <Button
-                  variant="secondary"
-                  size="md"
-                  className="flex-1"
-                  onClick={() => {
-                    setModalSenha(false);
-                    setSenhaData({ senhaAtual: '', novaSenha: '', confirmarSenha: '' });
-                    setErro('');
-                  }}
-                  disabled={carregando}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  variant="primary"
-                  size="md"
-                  className="flex-1"
-                  isLoading={carregando}
-                  type="submit"
-                >
-                  Atualizar
-                </Button>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+                <button type="button" onClick={() => { setModalSenha(false); setSenhaData({ senhaAtual: '', novaSenha: '', confirmarSenha: '' }); }} style={btnOutline} disabled={carregando}>Cancelar</button>
+                <button type="submit" disabled={carregando} style={btnGold}>{carregando ? '...' : 'Salvar'}</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* MODAL: Editar Reserva */}
-      {modalEdicaoReserva && reservaEdicao && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">
-              ✏️ Editar Reserva
-            </h2>
-
-            <form onSubmit={handleSalvarReserva} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Restaurante
-                </label>
-                <p className="text-lg text-gray-900 bg-gray-50 p-3 rounded">
-                  {obterNomeRestaurante(reservaEdicao.restaurante)}
-                </p>
-              </div>
-
-              <Input
-                type="date"
-                label="Data"
-                value={formReserva.data_reserva}
-                onChange={(e) =>
-                  setFormReserva({ ...formReserva, data_reserva: e.target.value })
-                }
-                disabled={carregando}
-              />
-
-              <Input
-                type="time"
-                label="Horário"
-                value={formReserva.horario}
-                onChange={(e) =>
-                  setFormReserva({ ...formReserva, horario: e.target.value })
-                }
-                disabled={carregando}
-              />
-
-              <Input
-                type="number"
-                label="Quantidade de Pessoas"
-                min="1"
-                max="20"
-                value={formReserva.quantidade_pessoas}
-                onChange={(e) =>
-                  setFormReserva({ ...formReserva, quantidade_pessoas: e.target.value })
-                }
-                disabled={carregando}
-              />
-
-              <div className="flex gap-3 pt-4">
-                <Button
-                  variant="secondary"
-                  size="md"
-                  className="flex-1"
-                  onClick={() => {
-                    setModalEdicaoReserva(false);
-                    setReservaEdicao(null);
-                  }}
-                  disabled={carregando}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  variant="primary"
-                  size="md"
-                  className="flex-1"
-                  isLoading={carregando}
-                  type="submit"
-                >
-                  Salvar
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: Confirmar Cancelamento */}
+      {/* ── MODAL: Cancelar Reserva ── */}
       {modalCancelamento && reservaCancelamento && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              ⚠️ Cancelar Reserva
-            </h2>
-            <p className="text-gray-600 mb-6 text-sm">
-              Tem certeza que deseja cancelar a reserva em{' '}
-              <strong>{obterNomeRestaurante(reservaCancelamento.restaurante)}</strong> para{' '}
-              <strong>{formatarData(reservaCancelamento.data_reserva)}</strong> às{' '}
-              <strong>{reservaCancelamento.horario}</strong>?
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
+          <div style={{ backgroundColor: '#fff', borderRadius: 14, padding: '28px 32px', maxWidth: 440, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.2)' }}>
+            <h2 style={{ fontWeight: 700, fontSize: '1.1rem', color: '#1a1a1a', marginBottom: 8 }}>Cancelar Reserva</h2>
+            <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: 18 }}>
+              Tem certeza que deseja cancelar a reserva em <strong>{obterNomeRestaurante(reservaCancelamento.restaurante)}</strong> para <strong>{formatarData(reservaCancelamento.data_reserva)}</strong> às <strong>{reservaCancelamento.horario}</strong>?
             </p>
-
-            <Input
-              label="Motivo do Cancelamento (opcional)"
-              placeholder="Ex: Compromisso imprevisto"
-              value={motivoCancelamento}
-              onChange={(e) => setMotivoCancelamento(e.target.value)}
-              disabled={carregando}
-            />
-
-            <div className="flex gap-3 pt-6">
-              <Button
-                variant="secondary"
-                size="md"
-                className="flex-1"
-                onClick={() => {
-                  setModalCancelamento(false);
-                  setReservaCancelamento(null);
-                }}
-                disabled={carregando}
-              >
-                Manter Reserva
-              </Button>
-              <Button
-                variant="danger"
-                size="md"
-                className="flex-1"
-                isLoading={carregando}
-                onClick={handleConfirmarCancelamento}
-              >
-                Confirmar
-              </Button>
+            <div style={{ marginBottom: 20 }}>
+              <label style={labelStyle}>Motivo (opcional)</label>
+              <input value={motivoCancelamento} onChange={e => setMotivoCancelamento(e.target.value)} style={inputStyle} placeholder="Ex: Compromisso imprevisto" disabled={carregando} />
             </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setModalCancelamento(false)} style={{ ...btnOutline, flex: 1 }} disabled={carregando}>Manter Reserva</button>
+              <button onClick={handleConfirmarCancelamento} disabled={carregando} style={{ flex: 1, backgroundColor: '#e05555', border: 'none', color: '#fff', borderRadius: 8, padding: '10px', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer' }}>
+                {carregando ? '...' : 'Confirmar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: Editar Reserva ── */}
+      {modalEdicaoReserva && reservaEdicao && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
+          <div style={{ backgroundColor: '#fff', borderRadius: 14, padding: '28px 32px', maxWidth: 440, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.2)' }}>
+            <h2 style={{ fontWeight: 700, fontSize: '1.1rem', color: '#1a1a1a', marginBottom: 20 }}>Editar Reserva</h2>
+            <form onSubmit={handleSalvarReserva}>
+              <div style={{ marginBottom: 14 }}>
+                <label style={labelStyle}>Restaurante</label>
+                <p style={{ ...inputStyle, margin: 0, color: '#555' }}>{obterNomeRestaurante(reservaEdicao.restaurante)}</p>
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <label style={labelStyle}>Data</label>
+                <input type="date" value={formReserva.data_reserva} onChange={e => setFormReserva({ ...formReserva, data_reserva: e.target.value })} style={inputStyle} disabled={carregando} />
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <label style={labelStyle}>Horário</label>
+                <input type="time" value={formReserva.horario} onChange={e => setFormReserva({ ...formReserva, horario: e.target.value })} style={inputStyle} disabled={carregando} />
+              </div>
+              <div style={{ marginBottom: 20 }}>
+                <label style={labelStyle}>Quantidade de Pessoas</label>
+                <input type="number" min="1" max="20" value={formReserva.quantidade_pessoas} onChange={e => setFormReserva({ ...formReserva, quantidade_pessoas: e.target.value })} style={inputStyle} disabled={carregando} />
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button type="button" onClick={() => setModalEdicaoReserva(false)} style={{ ...btnOutline, flex: 1 }}>Cancelar</button>
+                <button type="submit" disabled={carregando} style={{ ...btnGold, flex: 1 }}>{carregando ? '...' : 'Salvar'}</button>
+              </div>
+            </form>
           </div>
         </div>
       )}

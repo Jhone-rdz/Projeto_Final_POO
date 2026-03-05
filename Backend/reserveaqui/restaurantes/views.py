@@ -275,7 +275,7 @@ class RestauranteUsuarioViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def meus_restaurantes(self, request):
-        """Retorna os restaurantes do usuário autenticado (se for proprietário)"""
+        """Retorna os restaurantes do usuário autenticado (proprietário, funcionário ou admin)"""
         user = request.user
         
         # Se for admin_sistema, retorna todos os restaurantes
@@ -285,7 +285,18 @@ class RestauranteUsuarioViewSet(viewsets.ModelViewSet):
             restaurantes = Restaurante.objects.all()
         else:
             # Se for admin_secundario, retorna seu restaurante (é o proprietário)
-            restaurantes = Restaurante.objects.filter(proprietario=user)
+            restaurantes_proprietario = Restaurante.objects.filter(proprietario=user)
+            
+            # Se for funcionário, retorna restaurantes via RestauranteUsuario (related_name='usuarios')
+            restaurantes_funcionario = Restaurante.objects.filter(
+                usuarios__usuario=user
+            )
+            
+            # Combina ambas as queries
+            restaurantes = restaurantes_proprietario | restaurantes_funcionario
+        
+        # Remove duplicatas se houver
+        restaurantes = restaurantes.distinct()
         
         # Usar RestauranteListSerializer para retornar dados formatados
         from .serializers import RestauranteListSerializer

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 const GOLD = '#C9922A';
 
 /**
- * Componente de Footer — tema escuro ReservaFácil
+ * Componente de Footer — tema escuro ReserveAqui
  */
 export const Footer = () => {
   return (
@@ -24,7 +24,7 @@ export const Footer = () => {
                 <path d="M8 16l3 3 6-6" stroke={GOLD} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               <span style={{ color: GOLD, fontWeight: 700, fontSize: '1.1rem', fontFamily: "'Georgia', serif" }}>
-                ReservaFácil
+                ReserveAqui
               </span>
             </div>
             <p style={{ color: '#888', fontSize: '0.875rem', lineHeight: 1.65 }}>
@@ -38,7 +38,6 @@ export const Footer = () => {
             <ul className="space-y-2">
               {[
                 { label: 'Home', to: '/' },
-                { label: 'Restaurantes', to: '/restaurants' },
                 { label: 'Sobre nós', href: '#' },
                 { label: 'Contato', href: '#' },
               ].map(item => (
@@ -79,12 +78,12 @@ export const Footer = () => {
             <h3 className="font-bold mb-4" style={{ color: '#fff', fontSize: '0.95rem' }}>Contato</h3>
             <ul className="space-y-2">
               <li>
-                <a href="mailto:suporte@reservafacil.com"
+                <a href="mailto:suporte@reserveaqui.com"
                   style={{ color: '#888', fontSize: '0.875rem', textDecoration: 'none' }}
                   onMouseEnter={e => (e.currentTarget.style.color = GOLD)}
                   onMouseLeave={e => (e.currentTarget.style.color = '#888')}
                 >
-                  suporte@reservafacil.com
+                  suporte@reserveaqui.com
                 </a>
               </li>
               <li>
@@ -106,7 +105,7 @@ export const Footer = () => {
         {/* Copyright */}
         <div className="flex flex-col md:flex-row justify-between items-center py-6 gap-4">
           <p style={{ color: '#666', fontSize: '0.82rem', fontWeight: 600 }}>
-            © 2026 ReservaFácil. Todos os direitos reservados.
+            © 2026 ReserveAqui. Todos os direitos reservados.
           </p>
           <div className="flex gap-5">
             {['Facebook', 'Instagram', 'Twitter'].map(social => (

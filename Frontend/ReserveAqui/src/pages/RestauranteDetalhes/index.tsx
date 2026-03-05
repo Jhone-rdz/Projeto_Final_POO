@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Header, Footer } from '../../components/layout';
-import { Button } from '../../components/common';
 import { restaurantesService, mesasService } from '../../services/api';
 import type { Restaurante, Mesa } from '../../types';
 import { useAuth } from '../../context';
 
+const GOLD = '#C9922A';
+const BEGE = '#E8E4DE';
+
 /**
- * Página de Detalhes do Restaurante
+ * Página de Detalhes do Restaurante — tema ReservaFácil
  */
 const RestauranteDetalhes = () => {
   const { id } = useParams<{ id: string }>();
@@ -19,285 +21,217 @@ const RestauranteDetalhes = () => {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
 
-  useEffect(() => {
-    if (id) {
-      carregarDetalhes();
-    }
-  }, [id]);
+  useEffect(() => { if (id) carregarDetalhes(); }, [id]);
 
   const carregarDetalhes = async () => {
     try {
       setCarregando(true);
       setErro('');
-
-      // Carregar restaurante
       const restauranteData = await restaurantesService.obter(Number(id));
       setRestaurante(restauranteData);
-
-      // Carregar mesas apenas para usuário autenticado
       if (isAuthenticated) {
-        const mesasResponse = await mesasService.listar({
-          restaurante: Number(id),
-        });
-        const listaMesas = Array.isArray(mesasResponse)
-          ? mesasResponse
-          : (mesasResponse.results || []);
-        setMesas(listaMesas);
+        try {
+          const mesasResponse = await mesasService.listar({ restaurante: Number(id) });
+          // Log para debug
+          console.log('Mesas Response:', mesasResponse);
+          setMesas(Array.isArray(mesasResponse) ? mesasResponse : (mesasResponse.results || []));
+        } catch (err) {
+          // Se falhar ao carregar mesas, apenas continua sem elas
+          console.error('Erro ao carregar mesas:', err);
+          setMesas([]);
+        }
       } else {
         setMesas([]);
       }
-    } catch (error) {
-      console.error('Erro ao carregar detalhes:', error);
-      setErro('Não foi possível carregar os detalhes do restaurante. Tente novamente mais tarde.');
+    } catch {
+      setErro('Não foi possível carregar os detalhes do restaurante.');
     } finally {
       setCarregando(false);
     }
   };
 
-  const contarMesasDisponiveis = () => {
-    if (!isAuthenticated && restaurante) {
-      return restaurante.quantidade_mesas || 0;
-    }
-    return mesas.filter((mesa) => mesa.status === 'disponivel').length;
-  };
+  const mesasDisponiveis = isAuthenticated
+    ? mesas.filter(m => m.status === 'disponivel').length
+    : (restaurante?.quantidade_mesas || 0);
+
+  const totalMesas = isAuthenticated ? mesas.length : (restaurante?.quantidade_mesas || 0);
 
   const handleFazerReserva = () => {
     if (!isAuthenticated) {
-      navigate('/login', {
-        state: { returnTo: `/restaurantes/${id}` },
-      });
+      navigate('/login', { state: { returnTo: `/restaurantes/${id}` } });
     } else {
       navigate(`/reserva/${id}`);
     }
   };
 
-  // Carregando
+  // ── Loading ──
   if (carregando) {
     return (
-      <div className="w-full flex flex-col min-h-screen bg-gray-50">
+      <div className="w-full flex flex-col min-h-screen" style={{ backgroundColor: BEGE }}>
         <Header />
-
-        <main className="w-full flex-1 flex items-center justify-center py-16">
+        <main className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
-            <div className="animate-spin">
-              <svg className="w-12 h-12 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 6v6m0 0v6m0-6h6m0 0h6M6 12a6 6 0 11-12 0 6 6 0 0112 0z"
-                />
-              </svg>
-            </div>
-            <p className="text-gray-600 font-medium">Carregando detalhes do restaurante...</p>
+            <div className="animate-spin rounded-full" style={{ width: 44, height: 44, border: '4px solid #e5d9c8', borderTopColor: GOLD }} />
+            <p style={{ color: '#666' }}>Carregando detalhes do restaurante...</p>
           </div>
         </main>
-
         <Footer />
       </div>
     );
   }
 
-  // Erro ou restaurante não encontrado
+  // ── Erro ──
   if (erro || !restaurante) {
     return (
-      <div className="w-full flex flex-col min-h-screen bg-gray-50">
+      <div className="w-full flex flex-col min-h-screen" style={{ backgroundColor: BEGE }}>
         <Header />
-
-        <main className="w-full flex-1 flex items-center justify-center py-16">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-12 max-w-md text-center">
-            <svg className="w-16 h-16 text-red-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <p className="text-red-800 text-lg mb-6">{erro || 'Restaurante não encontrado'}</p>
-            <Button
-              variant="primary"
-              size="md"
-              onClick={() => navigate('/')}
-              className="w-full"
-            >
+        <main className="flex-1 flex items-center justify-center px-4">
+          <div style={{ backgroundColor: '#fff', borderRadius: 14, padding: '40px 32px', maxWidth: 400, textAlign: 'center' }}>
+            <p style={{ color: '#e05555', marginBottom: 20 }}>{erro || 'Restaurante não encontrado'}</p>
+            <button onClick={() => navigate('/')} style={{ backgroundColor: GOLD, border: 'none', color: '#fff', borderRadius: 8, padding: '10px 28px', fontWeight: 700, cursor: 'pointer' }}>
               Voltar para Home
-            </Button>
+            </button>
           </div>
         </main>
-
         <Footer />
       </div>
     );
   }
 
-  const mesasDisponiveis = contarMesasDisponiveis();
-  const totalMesas = isAuthenticated ? mesas.length : (restaurante.quantidade_mesas || 0);
-
   return (
-    <div className="w-full flex flex-col min-h-screen bg-gray-50">
+    <div className="w-full flex flex-col min-h-screen" style={{ backgroundColor: BEGE }}>
       <Header />
 
-      {/* Hero Section */}
-      <section className="w-full relative h-80 bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 text-white overflow-hidden">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-20">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl"></div>
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-300 rounded-full mix-blend-multiply filter blur-3xl"></div>
-        </div>
+      {/* ── Hero: foto full-width com overlay e nome ── */}
+      <section style={{ position: 'relative', width: '100%', height: 420, overflow: 'hidden' }}>
+        {/* Foto de fundo */}
+        <img
+          src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1600&q=80"
+          alt={restaurante.nome}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+        />
+        {/* Overlay gradient escuro na parte inferior */}
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.1) 60%, transparent 100%)' }} />
 
-        {/* Conteúdo */}
-        <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center gap-8">
-          {/* Imagem */}
-          <div className="hidden md:flex md:w-1/3 justify-center">
-            <div className="w-64 h-64 bg-white rounded-lg shadow-lg flex items-center justify-center overflow-hidden">
-              <svg className="w-32 h-32 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" />
-              </svg>
-            </div>
-          </div>
-
-          {/* Informações */}
-          <div className="flex-1">
-            <h1 className="text-5xl font-bold mb-4">{restaurante.nome}</h1>
-            <p className="text-xl text-blue-100 mb-4">{restaurante.descricao}</p>
-
-            {/* Localização */}
-            <div className="flex items-start gap-3 text-blue-100">
-              <svg className="w-6 h-6 mt-1 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-              </svg>
-              <div>
-                <p className="font-medium">{restaurante.endereco}</p>
-                <p>{restaurante.cidade}, {restaurante.estado} - CEP: {restaurante.cep}</p>
-              </div>
-            </div>
-
-            {/* Contato */}
-            <div className="mt-6 flex gap-6">
-              <a href={`tel:${restaurante.telefone}`} className="flex items-center gap-2 hover:text-blue-200 transition">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773c.26.559.738 1.272 1.469 2.002.73.73 1.443 1.209 2.002 1.469l.773-1.548a1 1 0 011.06-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 4 14.18 4 9.5V5a1 1 0 01-1-1H3z" />
-                </svg>
-                <span>{restaurante.telefone}</span>
-              </a>
-              <a href={`mailto:${restaurante.email}`} className="flex items-center gap-2 hover:text-blue-200 transition">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
-                  <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
-                </svg>
-                <span>Email</span>
-              </a>
-            </div>
-          </div>
+        {/* Badge de culinária + título */}
+        <div style={{ position: 'absolute', bottom: 32, left: 40 }}>
+          <h1 style={{ color: '#fff', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 700, fontFamily: "'Georgia', serif", textShadow: '0 2px 12px rgba(0,0,0,0.5)', margin: 0 }}>
+            {restaurante.nome}
+          </h1>
         </div>
       </section>
 
-      {/* Seção de Disponibilidade */}
-      <section className="w-full flex-1 py-16">
-        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Título */}
-          <div className="mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Disponibilidade de Mesas</h2>
-            <p className="text-lg text-gray-600">Confira a quantidade de mesas disponíveis e reserve agora</p>
-          </div>
+      {/* ── Conteúdo principal ── */}
+      <main className="w-full flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
 
-          {/* Cards de Disponibilidade */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-            {/* Card: Total de Mesas */}
-            <div className="bg-white rounded-lg shadow-md p-8">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-700">Total de Mesas</h3>
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                  <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M2 6a1 1 0 011-1h14a1 1 0 011 1v8a1 1 0 01-1 1H3a1 1 0 01-1-1V6zM4 4a2 2 0 100-4 2 2 0 000 4zM14 4a2 2 0 100-4 2 2 0 000 4z" />
+        {/* Layout 2 colunas: info + sidebar reserva */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+
+          {/* ── Coluna principal ── */}
+          <div className="lg:col-span-2">
+            {/* Sobre */}
+            {restaurante.descricao && (
+              <div style={{ marginBottom: 28 }}>
+                <p style={{ fontWeight: 700, color: '#1a1a1a', fontSize: '0.95rem', marginBottom: 4 }}>Sobre</p>
+                <p style={{ color: '#1a1a1a', fontWeight: 600, fontSize: '0.95rem', lineHeight: 1.6 }}>
+                  {restaurante.descricao}
+                </p>
+              </div>
+            )}
+
+            {/* Cards de info: Localização, Horário, Mesas */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Localização */}
+              <div style={{ backgroundColor: '#fff', borderRadius: 12, padding: '18px 20px', border: '1px solid #e5ddd5', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <div style={{ width: 40, height: 40, borderRadius: '50%', backgroundColor: '#f5f0ea', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2" strokeLinecap="round">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
+                    <circle cx="12" cy="9" r="2.5" />
                   </svg>
-                </div>
-              </div>
-              <p className="text-4xl font-bold text-gray-900">{totalMesas}</p>
-            </div>
-
-            {/* Card: Mesas Disponíveis */}
-            <div className="bg-white rounded-lg shadow-md p-8">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-700">Disponíveis Agora</h3>
-                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                  <svg className="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                </div>
-              </div>
-              <p className="text-4xl font-bold text-green-600">{mesasDisponiveis}</p>
-            </div>
-
-            {/* Card: Mesas Ocupadas */}
-            <div className="bg-white rounded-lg shadow-md p-8">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-700">Ocupadas</h3>
-                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                  <svg className="w-6 h-6 text-red-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M13.477 14.89A6 6 0 015.11 2.526a6 6 0 008.367 8.367A6 6 0 0113.477 14.89z" clipRule="evenodd" />
-                  </svg>
-                </div>
-              </div>
-              <p className="text-4xl font-bold text-red-600">{totalMesas - mesasDisponiveis}</p>
-            </div>
-          </div>
-
-          {/* Status e Botão de Reserva */}
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 p-8">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-              {/* Status */}
-              <div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">Pronto para Reservar?</h3>
-                {mesasDisponiveis > 0 ? (
-                  <p className="text-lg text-green-600 font-medium">✓ Temos mesas disponíveis!</p>
-                ) : (
-                  <p className="text-lg text-orange-600 font-medium">⚠ Nenhuma mesa disponível no momento</p>
-                )}
-              </div>
-
-              {/* Botão */}
-              <Button
-                variant={mesasDisponiveis > 0 ? 'primary' : 'secondary'}
-                size="md"
-                onClick={handleFazerReserva}
-                disabled={mesasDisponiveis === 0}
-              >
-                {isAuthenticated ? 'Fazer Reserva' : 'Fazer Login para Reservar'}
-              </Button>
-            </div>
-          </div>
-
-          {/* Informações Adicionais */}
-          <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Capacidade das Mesas */}
-            <div className="bg-white rounded-lg shadow-md p-8">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Capacidade das Mesas</h3>
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span className="text-2xl font-bold text-blue-600">4</span>
                 </div>
                 <div>
-                  <p className="text-gray-600">Cada mesa acomoda</p>
-                  <p className="text-2xl font-bold text-gray-900">4 pessoas</p>
+                  <p style={{ fontWeight: 700, color: '#1a1a1a', fontSize: '0.9rem', marginBottom: 2 }}>Localização</p>
+                  <p style={{ color: '#555', fontSize: '0.85rem' }}>{restaurante.endereco} - {restaurante.cidade}</p>
+                </div>
+              </div>
+
+              {/* Horário */}
+              <div style={{ backgroundColor: '#fff', borderRadius: 12, padding: '18px 20px', border: '1px solid #e5ddd5', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <div style={{ width: 40, height: 40, borderRadius: '50%', backgroundColor: '#f5f0ea', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2" strokeLinecap="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 6v6l4 2" />
+                  </svg>
+                </div>
+                <div>
+                  <p style={{ fontWeight: 700, color: '#1a1a1a', fontSize: '0.9rem', marginBottom: 2 }}>Horário</p>
+                  <p style={{ color: '#555', fontSize: '0.85rem' }}>
+                    {restaurante.horario_funcionamento || '11:00 - 23:00'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Mesas disponíveis */}
+              <div style={{ backgroundColor: '#fff', borderRadius: 12, padding: '18px 20px', border: '1px solid #e5ddd5', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <div style={{ width: 40, height: 40, borderRadius: '50%', backgroundColor: '#f5f0ea', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2" strokeLinecap="round">
+                    <rect x="3" y="8" width="18" height="4" rx="1" />
+                    <path d="M5 12v5M19 12v5M8 8V6a4 4 0 018 0v2" />
+                  </svg>
+                </div>
+                <div>
+                  <p style={{ fontWeight: 700, color: '#1a1a1a', fontSize: '0.9rem', marginBottom: 2 }}>Mesas disponíveis</p>
+                  <p style={{ color: '#555', fontSize: '0.85rem' }}>
+                    {mesasDisponiveis} de {totalMesas}
+                  </p>
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Próximos Passos */}
-            <div className="bg-white rounded-lg shadow-md p-8">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Próximos Passos</h3>
-              <ol className="list-decimal list-inside space-y-2 text-gray-600">
-                <li>Escolha a data e horário da sua reserva</li>
-                <li>Selecione a quantidade de pessoas</li>
-                <li>Confirme sua reserva</li>
-                <li>Receba confirmação por email</li>
-              </ol>
-            </div>
+          {/* ── Sidebar: Fazer reserva ── */}
+          <div style={{ backgroundColor: '#fff', borderRadius: 14, padding: '24px 28px', border: '1px solid #e5ddd5', boxShadow: '0 2px 16px rgba(0,0,0,0.07)', position: 'sticky', top: 88 }}>
+            <p style={{ fontWeight: 700, color: '#1a1a1a', fontSize: '1rem', marginBottom: 6 }}>Faça sua reserva</p>
+            <p style={{ color: '#1a1a1a', fontWeight: 600, fontSize: '0.9rem', marginBottom: 20 }}>
+              {mesasDisponiveis} mesas.
+            </p>
+
+            <button
+              onClick={handleFazerReserva}
+              disabled={mesasDisponiveis === 0}
+              style={{
+                width: '100%',
+                backgroundColor: mesasDisponiveis > 0 ? GOLD : '#ccc',
+                border: 'none',
+                color: mesasDisponiveis > 0 ? '#fff' : '#888',
+                borderRadius: 8,
+                padding: '12px',
+                fontWeight: 700,
+                fontSize: '0.95rem',
+                cursor: mesasDisponiveis > 0 ? 'pointer' : 'not-allowed',
+                marginBottom: 12,
+                transition: 'background-color 0.2s',
+              }}
+              onMouseEnter={e => { if (mesasDisponiveis > 0) (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#b07e1e'; }}
+              onMouseLeave={e => { if (mesasDisponiveis > 0) (e.currentTarget as HTMLButtonElement).style.backgroundColor = GOLD; }}
+            >
+              Fazer reserva
+            </button>
+
+            {!isAuthenticated && (
+              <p style={{ color: '#888', fontSize: '0.82rem', textAlign: 'center' }}>
+                É necessário estar logado para reservar.
+              </p>
+            )}
+
+            {mesasDisponiveis === 0 && (
+              <p style={{ color: '#e05555', fontSize: '0.82rem', textAlign: 'center', marginTop: 4 }}>
+                Nenhuma mesa disponível no momento.
+              </p>
+            )}
           </div>
         </div>
-      </section>
+      </main>
 
       <Footer />
     </div>

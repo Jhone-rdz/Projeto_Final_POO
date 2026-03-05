@@ -46,22 +46,55 @@ class ReservaViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """
-        Filtrar reservas por usuário.
-        - Admins veem todas as reservas
-        - Usuários comuns veem apenas suas próprias reservas
+        Filtrar reservas por usuário e papel.
+        - Admin_sistema: vê todas as reservas
+        - Admin_secundario (proprietário): vê reservas do seu restaurante
+        - Funcionário: vê reservas do restaurante onde trabalha
+        - Cliente: vê apenas suas próprias reservas
         """
         queryset = super().get_queryset()
         user = self.request.user
         
-        # Verificar se é admin
-        is_admin = user.usuariopapel_set.filter(
-            papel__tipo__in=['admin_sistema', 'admin_secundario']
+        if not user.is_authenticated:
+            return queryset.none()
+        
+        # Admin_sistema vê tudo
+        is_admin_sistema = user.usuariopapel_set.filter(
+            papel__tipo='admin_sistema'
         ).exists()
         
-        if is_admin:
+        if is_admin_sistema:
             return queryset
         
-        # Usuário comum vê apenas suas reservas
+        # Admin_secundario (proprietário): vê reservas de seu restaurante
+        is_admin_secundario = user.usuariopapel_set.filter(
+            papel__tipo='admin_secundario'
+        ).exists()
+        
+        if is_admin_secundario:
+            from restaurantes.models import Restaurante
+            seu_restaurante = Restaurante.objects.filter(proprietario=user).first()
+            if seu_restaurante:
+                return queryset.filter(restaurante=seu_restaurante)
+            return queryset.none()
+        
+        # Funcionário: vê reservas do restaurante onde trabalha
+        is_funcionario = user.usuariopapel_set.filter(
+            papel__tipo='funcionario'
+        ).exists()
+        
+        if is_funcionario:
+            from restaurantes.models import RestauranteUsuario
+            restaurantes_ids = RestauranteUsuario.objects.filter(
+                usuario=user,
+                papel='funcionario'
+            ).values_list('restaurante_id', flat=True)
+            
+            if restaurantes_ids:
+                return queryset.filter(restaurante_id__in=restaurantes_ids)
+            return queryset.none()
+        
+        # Cliente: vê apenas suas próprias reservas
         return queryset.filter(usuario=user)
     
     def create(self, request, *args, **kwargs):
@@ -127,7 +160,7 @@ class ReservaViewSet(viewsets.ModelViewSet):
             status=status.HTTP_204_NO_CONTENT
         )
     
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def confirmar(self, request, pk=None):
         """
         Confirmar reserva.
@@ -190,7 +223,7 @@ class ReservaViewSet(viewsets.ModelViewSet):
         
         # Confirmar reserva
         reserva.status = 'confirmada'
-        reserva.save()
+        reserva.save(skip_validation=True)
         
         # Criar notificação de confirmação para o cliente
         if reserva.usuario:
@@ -210,7 +243,7 @@ class ReservaViewSet(viewsets.ModelViewSet):
             'reserva': serializer.data
         })
     
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def cancelar(self, request, pk=None):
         """
         Cancelar reserva.
@@ -266,18 +299,27 @@ class ReservaViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        if not reserva.pode_cancelar():
-            return Response(
-                {'error': 'Não é possível cancelar reservas com menos de 2 horas de antecedência.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # Verificar se pode cancelar
+        # Proprietários/admins podem cancelar qualquer reserva
+        # Clientes só podem cancelar com 30 minutos de antecedência
+        is_proprietario = user == reserva.restaurante.proprietario or user.usuariopapel_set.filter(
+            papel__tipo__in=['admin_sistema', 'admin_secundario']
+        ).exists()
+        
+        if not is_proprietario:
+            # Cliente: verificar restrições de tempo
+            if not reserva.pode_cancelar():
+                return Response(
+                    {'error': 'Não é possível cancelar reservas com menos de 30 minutos de antecedência.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
         
         # RN03: Liberar mesas automaticamente
         ReservaMesa.objects.filter(reserva=reserva).delete()
         
         # Atualizar status
         reserva.status = 'cancelada'
-        reserva.save()
+        reserva.save(skip_validation=True)
         
         serializer = ReservaSerializer(reserva)
         return Response({
@@ -285,7 +327,7 @@ class ReservaViewSet(viewsets.ModelViewSet):
             'reserva': serializer.data
         })
     
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def concluir(self, request, pk=None):
         """
         Marca a reserva como concluída.
@@ -335,7 +377,7 @@ class ReservaViewSet(viewsets.ModelViewSet):
         
         # Concluir reserva
         reserva.status = 'concluida'
-        reserva.save()
+        reserva.save(skip_validation=True)
         
         serializer = ReservaSerializer(reserva)
         return Response({
@@ -358,6 +400,79 @@ class ReservaViewSet(viewsets.ModelViewSet):
         if page is not None:
             serializer = ReservaListSerializer(page, many=True)
             return self.get_paginated_response(serializer.data)
+        
+        serializer = ReservaListSerializer(queryset, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def hoje(self, request):
+        """
+        Listar reservas de hoje para um restaurante específico.
+        Filtrada por query param 'restaurante'.
+        
+        Permitido para:
+        - Admin_sistema: vê todas as reservas de hoje de qualquer restaurante
+        - Admin_secundario: vê apenas reservas do seu restaurante
+        - Funcionário: vê apenas reservas do restaurante onde trabalha
+        - Cliente: não tem acesso
+        """
+        restaurante_id = request.query_params.get('restaurante')
+        
+        if not restaurante_id:
+            return Response(
+                {'error': 'Query param "restaurante" é obrigatório'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        from restaurantes.models import Restaurante, RestauranteUsuario
+        
+        try:
+            restaurante = Restaurante.objects.get(id=restaurante_id)
+        except Restaurante.DoesNotExist:
+            return Response(
+                {'error': 'Restaurante não encontrado'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        user = request.user
+        
+        # Verificar permissão
+        is_admin_sistema = user.usuariopapel_set.filter(
+            papel__tipo='admin_sistema'
+        ).exists()
+        
+        if not is_admin_sistema:
+            # Admin_secundario: deve ser proprietário
+            if user != restaurante.proprietario:
+                # Funcionário: deve trabalhar naquele restaurante
+                is_funcionario = user.usuariopapel_set.filter(
+                    papel__tipo='funcionario'
+                ).exists()
+                
+                if is_funcionario:
+                    trabalha_aqui = RestauranteUsuario.objects.filter(
+                        usuario=user,
+                        restaurante=restaurante,
+                        papel='funcionario'
+                    ).exists()
+                    
+                    if not trabalha_aqui:
+                        return Response(
+                            {'error': 'Você não tem acesso a este restaurante'},
+                            status=status.HTTP_403_FORBIDDEN
+                        )
+                else:
+                    return Response(
+                        {'error': 'Você não tem permissão'},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+        
+        # Filtrar reservas de hoje
+        hoje = timezone.now().date()
+        queryset = Reserva.objects.filter(
+            restaurante=restaurante,
+            data_reserva=hoje
+        ).order_by('horario')
         
         serializer = ReservaListSerializer(queryset, many=True)
         return Response(serializer.data)

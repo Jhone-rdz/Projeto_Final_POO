@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { Usuario, LoginResponse } from '../types';
-import { authService } from '../services/api';
+import { authService, usuariosService } from '../services/api';
 
 const extrairMensagemErro = (err: any, fallback: string): string => {
   const data = err?.response?.data;
@@ -41,6 +41,7 @@ export interface AuthContextType {
   }) => Promise<void>;
   logout: () => void;
   trocarSenha: (senhaAtual: string, novaSenha: string) => Promise<void>;
+  atualizarDados: (dados: { nome: string; email: string }) => Promise<void>;
   solicitarRecuperacao: (email: string) => Promise<void>;
   redefinirSenha: (token: string, novaSenha: string) => Promise<void>;
   clearError: () => void;
@@ -201,6 +202,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
   };
 
+  /**
+   * Atualizar dados do usuário
+   */
+  const atualizarDados = async (dados: { nome: string; email: string }) => {
+    setError(null);
+
+    if (!usuario) {
+      setError('Usuário não autenticado');
+      throw new Error('Usuário não autenticado');
+    }
+
+    try {
+      await usuariosService.atualizar(usuario.id, dados);
+      // Recarregar dados do usuário após atualização
+      const usuarioAtualizado = await authService.me();
+      setUsuario(usuarioAtualizado);
+      setError(null);
+    } catch (err: any) {
+      const errorMessage = extrairMensagemErro(err, 'Erro ao atualizar dados');
+      setError(errorMessage);
+      throw err;
+    }
+  };
+
   const value: AuthContextType = {
     usuario,
     isAuthenticated: !!usuario,
@@ -210,6 +235,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     cadastro,
     logout,
     trocarSenha,
+    atualizarDados,
     solicitarRecuperacao,
     redefinirSenha,
     clearError,

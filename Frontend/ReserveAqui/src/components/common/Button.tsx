@@ -11,7 +11,7 @@ const GOLD = '#C9922A';
 const GOLD_DARK = '#b07e1e';
 
 /**
- * Componente de Button reutilizável — tema ReservaFácil
+ * Componente de Button reutilizável — tema ReserveAqui
  */
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ variant = 'primary', size = 'md', isLoading = false, className = '', children, disabled, style, ...props }, ref) => {

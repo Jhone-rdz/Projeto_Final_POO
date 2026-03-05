@@ -1,5 +1,42 @@
 # Backend - ReserveAqui API
 
+## Credenciais Padrão (Após População de Dados)
+
+Após executar `python manage.py seed_database`, use estas credenciais para testar:
+
+**ADMIN DE SISTEMA:**
+```
+Email: admin@reserveaqui.com
+Senha: admin123
+Permissões: Acesso total, gerenciar usuários, restaurantes, relatórios
+```
+
+**PROPRIETÁRIOS (3):**
+```
+Email: carlos@restaurante.com     | Senha: Senha@123
+Email: maria@restaurante.com      | Senha: Senha@123
+Email: joao@restaurante.com       | Senha: Senha@123
+Permissões: Gerenciar seu restaurante, mesas, reservas, equipe
+```
+
+**FUNCIONÁRIOS (6):**
+```
+Email: funcionarioX@reserveaqui.com  | Senha: Func@123
+(onde X = 1 a 6)
+Permissões: Gerenciar mesas e reservas do restaurante
+```
+
+**CLIENTES (10):**
+```
+Email: clienteX@email.com  | Senha: Cliente@123
+(onde X = 1 a 10)
+Permissões: Criar e gerenciar próprias reservas
+```
+
+---
+
+## Sobre o Projeto
+
 API REST para gerenciamento de reservas de mesas em restaurantes, desenvolvida em **Django 6.0.2** com **Django REST Framework** e **JWT Authentication**.
 
 ## Requisitos
@@ -13,7 +50,38 @@ API REST para gerenciamento de reservas de mesas em restaurantes, desenvolvida e
 - django-cors-headers 4.3.1
 - drf-spectacular 0.27.0
 
-## Setup Inicial
+## Quick Start (Setup Rápido)
+
+```bash
+# 1. Navegue até o backend
+cd Backend/reserveaqui
+
+# 2. Crie ambiente virtual (Linux/Mac)
+python3 -m venv venv
+source venv/bin/activate
+
+# (Windows PowerShell)
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+
+# 3. Instale dependências
+pip install -r ../requirements.txt
+
+# 4. Aplique migrações
+python manage.py migrate
+
+# 5. Popule o banco com dados de teste (IMPORTANTE!)
+python manage.py seed_database
+
+# 6. Inicie o servidor
+python manage.py runserver
+
+# Acesse: http://127.0.0.1:8000/
+```
+
+---
+
+## Setup Inicial - Passo a Passo
 
 ### 1. Ambiente Virtual
 
@@ -26,6 +94,9 @@ python -m venv venv
 
 # Ative (Windows PowerShell)
 .\venv\Scripts\Activate.ps1
+
+# (Linux/Mac via bash/zsh)
+source venv/bin/activate
 ```
 
 ### 2. Instalar Dependências
@@ -34,20 +105,141 @@ python -m venv venv
 pip install -r ../requirements.txt
 ```
 
-### 3. Migrações e Superusuário
+### 3. Migrações do Banco de Dados
 
 ```powershell
 python manage.py migrate
-python manage.py createsuperuser
 ```
 
-### 4. Executar Servidor
+Isso criará o banco SQLite com toda a estrutura de tabelas necessária.
+
+### 4. **População de Dados**
+
+```powershell
+python manage.py seed_database
+```
+
+**IMPORTANTE**: Este comando é essencial! Ele popula o banco com:
+- Usuários (Admin, Proprietários, Funcionários, Clientes)
+- Papéis (Roles do sistema)
+- Restaurantes de exemplo
+- Mesas para cada restaurante
+- Reservas de teste
+
+Sem este comando, o banco ficará vazio e a aplicação não funcionará corretamente.
+
+### 5. Executar Servidor
 
 ```powershell
 python manage.py runserver
 ```
 
 Acesse: `http://127.0.0.1:8000/`
+
+---
+
+## População de Dados (Seed Database)
+
+### O que é?
+
+O comando `seed_database` cria automaticamente dados de teste realistas no seu banco de dados, permitindo desenvolver e testar a aplicação sem precisar inserir dados manualmente.
+
+### O que é criado?
+
+```
+Papéis (Roles)
+   - admin_sistema
+   - admin_secundario (Proprietário)
+   - funcionario
+   - cliente
+
+Usuários (21 total)
+   - 1 Admin do Sistema
+   - 3 Proprietários
+   - 6 Funcionários
+   - 10 Clientes
+
+Restaurantes (3 total)
+   - Pizzaria Italia (São Paulo) - 12 mesas
+   - Churrascaria do Sul (Curitiba) - 15 mesas
+   - Sushi Premium (Rio de Janeiro) - 10 mesas
+
+Mesas (37 total)
+   - Distribuídas automaticamente entre restaurantes
+
+Reservas (32 total)
+   - Distribuídas entre restaurantes e clientes
+   - Datas variadas (passado, presente, futuro)
+```
+
+### Como usar?
+
+```bash
+# Após rodar as migrações, execute:
+python manage.py seed_database
+```
+
+### Saída esperada
+
+```
+Iniciando população do banco de dados...
+Criando papéis...
+Criando usuários...
+Criando restaurantes...
+Vinculando funcionários aos restaurantes...
+Criando mesas...
+Criando reservas...
+População do banco de dados concluída com sucesso!
+
+RESUMO DA POPULAÇÃO
+============================================================
+Admin do Sistema: 1 usuário
+   Email: admin@reserveaqui.com | Senha: admin123
+
+Proprietários: 3 usuários
+   Email: carlos@restaurante.com | Senha: Senha@123
+   Email: maria@restaurante.com | Senha: Senha@123
+   Email: joao@restaurante.com | Senha: Senha@123
+
+Funcionários: 6 usuários
+   Padrão: funcionarioX@reserveaqui.com | Senha: Func@123
+
+Clientes: 10 usuários
+   Padrão: clienteX@email.com | Senha: Cliente@123
+
+Restaurantes: 3 criados
+   - Pizzaria Italia: 12 mesas, X reservas
+   - Churrascaria do Sul: 15 mesas, X reservas
+   - Sushi Premium: 10 mesas, X reservas
+
+Total de Reservas: 32
+============================================================
+```
+
+### Importante
+
+- Sempre rode `python manage.py seed_database` **APÓS** as migrações
+- O comando é **idempotente**: pode ser executado múltiplas vezes sem duplicar dados
+- Se quiser resetar deixando dados em branco:
+  ```bash
+  rm db.sqlite3
+  python manage.py migrate
+  python manage.py seed_database
+  ```
+
+### Resetar Banco (Remover tudo)
+
+```bash
+# Linux/Mac
+rm db.sqlite3
+
+# Windows
+del db.sqlite3
+
+# Depois recriar
+python manage.py migrate
+python manage.py seed_database
+```
 
 ---
 
@@ -228,7 +420,7 @@ const response = await fetch('http://localhost:8000/api/usuarios/login/', {
 
 ---
 
-## 🧪 Testes
+## Testes
 
 ```powershell
 # Todos os testes
@@ -239,6 +431,66 @@ python manage.py test usuarios
 python manage.py test restaurantes
 python manage.py test mesas
 python manage.py test reservas
+```
+
+### Testar com Dados Populados
+
+```bash
+# Popule os dados
+python manage.py seed_database
+
+# Acesse o Admin Panel
+http://127.0.0.1:8000/admin/
+
+# Use qualquer credencial de teste para testar a API
+# Exemplo: admin@reserveaqui.com / admin123
+```
+
+---
+
+## Troubleshooting
+
+### Problema: "No module named 'utils.management.commands'"
+
+**Solução:** Certifique-se de que a pasta `utils/management/commands/` existe:
+```bash
+Backend/reserveaqui/
+├── utils/
+│   ├── __init__.py
+│   ├── management/
+│   │   ├── __init__.py
+│   │   └── commands/
+│   │       ├── __init__.py
+│   │       └── seed_database.py
+```
+
+### Problema: "Database is locked"
+
+**Solução:** Feche todos os terminais rodando o servidor Django e tente novamente:
+```bash
+# Mate o processo
+# Windows: Ctrl+C no terminal
+# Linux/Mac: Ctrl+C ou kill -9 <pid>
+
+# Depois tente novamente
+python manage.py seed_database
+```
+
+### Problema: Dados não aparecem após seed_database
+
+**Solução:** Verifique se as migrações foram aplicadas:
+```bash
+python manage.py migrate --check
+python manage.py migrate  # Se houver pendentes
+python manage.py seed_database
+```
+
+### Problema: "ModuleNotFoundError: No module named 'faker'"
+
+**Solução:**
+```bash
+pip install faker
+pip install -r ../requirements.txt
 ```
 
 ---
@@ -314,8 +566,126 @@ Gerenciar:
 
 ---
 
+## Workflow de Desenvolvimento
+
+### Inicialização do Projeto (Primeira vez)
+
+```bash
+# 1. Clone o repositório
+git clone <repo-url>
+cd Backend/reserveaqui
+
+# 2. Crie e ative venv
+python3 -m venv venv
+source venv/bin/activate  # Linux/Mac
+# OU
+.\venv\Scripts\Activate.ps1  # Windows
+
+# 3. Instale dependências
+pip install -r ../requirements.txt
+
+# 4. Aplique migrações
+python manage.py migrate
+
+# 5. **IMPORTANTE**: Popule dados de teste
+python manage.py seed_database
+
+# 6. Execute servidor
+python manage.py runserver
+
+# 7. Acesse
+# API: http://127.0.0.1:8000/
+# Admin: http://127.0.0.1:8000/admin/
+# Swagger: http://127.0.0.1:8000/api/docs/swagger/
+```
+
+### Desenvolvimento Diário
+
+```bash
+# Ativar venv
+source venv/bin/activate  # Linux/Mac
+
+# Iniciar servidor
+python manage.py runserver
+
+# Em outro terminal, fazer seu desenvolvimento
+# (editar codigo, modelos, etc)
+
+# Se alterar modelos, criar migração:
+python manage.py makemigrations
+python manage.py migrate
+
+# Se precisar resetar dados:
+rm db.sqlite3
+python manage.py migrate
+python manage.py seed_database
+```
+
+### Criar Nova Funcionalidade (Exemplo: Novo app)
+
+```bash
+# 1. Criar app
+python manage.py startapp minha_feature
+
+# 2. Adicionar ao INSTALLED_APPS em settings.py
+
+# 3. Criar modelos em models.py
+
+# 4. Criar migrações
+python manage.py makemigrations
+
+# 5. Aplicar migrações
+python manage.py migrate
+
+# 6. Criar serializers, views, urls
+
+# 7. Registrar em admin.py (se necessário)
+
+# 8. Testar
+python manage.py test minha_feature
+```
+
+### Restaurar Dados de Teste
+
+Sempre que quiser um banco limpo com dados padrão:
+
+```bash
+# Opção 1: Remover e recriar (Linux/Mac)
+rm db.sqlite3
+python manage.py migrate
+python manage.py seed_database
+
+# Opção 2: Remover e recriar (Windows)
+del db.sqlite3
+python manage.py migrate
+python manage.py seed_database
+
+# Opção 3: Apenas repopular (sem remover)
+python manage.py seed_database
+# (idempotent - não cria duplicatas)
+```
+
+---
+
+## Checklist de Inicialização
+
+Use este checklist para garantir que está tudo configurado corretamente:
+
+- [ ] Venv ativado
+- [ ] Dependências instaladas (`pip install -r ../requirements.txt`)
+- [ ] Migrações aplicadas (`python manage.py migrate`)
+- [ ] Banco populado (`python manage.py seed_database`)
+- [ ] Servidor rodando (`python manage.py runserver`)
+- [ ] Admin acessível em `http://127.0.0.1:8000/admin/`
+- [ ] Swagger acessível em `http://127.0.0.1:8000/api/docs/swagger/`
+- [ ] Consegue fazer login com `admin@reserveaqui.com / admin123`
+- [ ] Consegue criar uma reserva de teste como cliente
+- [ ] Frontend também está rodando em paralelo (verificar CORS)
+
+---
+
 # Tratamento de Erros
-🔐 Login
+Login
  Email não fornecido → 400 Bad Request ("Email obrigatório")
  Senha não fornecida → 400 Bad Request ("Senha obrigatória")
  Email não encontrado no banco → 401 Unauthorized ("Credenciais inválidas")
@@ -336,7 +706,7 @@ Gerenciar:
  Erro ao salvar no banco → 500 Internal Server Error + log
  Erro ao enviar email de confirmação → log (não bloqueia cadastro)
  Retornar usuario criado (sem senha)
-🔐 Recuperação de Senha
+ Recuperação de Senha
  Email não fornecido → 400 Bad Request
  Email não encontrado → 404 Not Found ("Email não encontrado")
  Erro ao gerar token de reset → 500 Internal Server Error + log
@@ -346,7 +716,7 @@ Gerenciar:
  Nova senha não fornecida → 400 Bad Request
  Nova senha fraca → 400 Bad Request
  Erro ao atualizar senha no banco → 500 Internal Server Error + log
-🔑 Trocar Senha (Logado)
+ Trocar Senha (Logado)
  Usuário não autenticado → 401 Unauthorized
  Token inválido/expirado → 401 Unauthorized
  Senha atual não fornecida → 400 Bad Request
@@ -358,7 +728,7 @@ Gerenciar:
  Confirmação ≠ nova senha → 400 Bad Request ("Senhas não conferem")
  Erro ao atualizar banco → 500 Internal Server Error + log
  Atualizar último change de senha
-👤 Editar Dados Pessoais
+ Editar Dados Pessoais
  Usuário não autenticado → 401 Unauthorized
  Token inválido → 401 Unauthorized
  Nome vazio → 400 Bad Request ("Nome obrigatório")
@@ -369,7 +739,7 @@ Gerenciar:
  Erro ao atualizar banco → 500 Internal Server Error + log
  Não permitir editar senha/role aqui
  Retornar usuário atualizado
-🏪 Listar Restaurantes
+ Listar Restaurantes
  Nenhum filtro → retornar todos com paginação
  Filtro por localização → validar valor
  Sem resultados → retornar array vazio (não é erro)
@@ -377,14 +747,14 @@ Gerenciar:
  Dados incompletos (NULL) → retornar NULL ou valor padrão
  Limite de paginação excedido → 400 Bad Request
  Página inválida → 400 Bad Request
-🍽️ Detalhe do Restaurante
+ Detalhe do Restaurante
  ID não fornecido → 400 Bad Request
  ID inválido (não é UUID) → 400 Bad Request
  Restaurante não encontrado → 404 Not Found
  Restaurante deletado logicamente → 404 Not Found
  Erro ao buscar banco → 500 Internal Server Error + log
  Retornar todas as informações (mesas, horários)
-🪑 Listar Mesas (com Disponibilidade)
+ Listar Mesas (com Disponibilidade)
  Restaurant_id não fornecido → 400 Bad Request
  Restaurant_id inválido → 400 Bad Request
  Data não fornecida → 400 Bad Request
@@ -399,7 +769,7 @@ Gerenciar:
  Nenhuma mesa disponível → retornar array vazio
  Retornar apenas mesas não deletadas
  Retornar status de disponibilidade de cada mesa
-📅 Criar Reserva (RF05)
+ Criar Reserva (RF05)
  Usuário não autenticado → 401 Unauthorized
  Token inválido → 401 Unauthorized
  Restaurant_id não fornecido → 400 Bad Request
@@ -424,7 +794,7 @@ Gerenciar:
  RF08: Enviar confirmação por email → log de envio
  Erro ao enviar email → log (não bloqueia reserva)
  Retornar reserva criada com ID e status
-📋 Listar Reservas do Cliente
+ Listar Reservas do Cliente
  Usuário não autenticado → 401 Unauthorized
  Erro ao buscar banco → 500 Internal Server Error + log
  Nenhuma reserva encontrada → retornar array vazio
@@ -432,7 +802,7 @@ Gerenciar:
  Incluir status de cada reserva
  Ordenar por data descendente (mais recentes primeiro)
  Filtro por status (confirmada, cancelada, atendida) → validar valor
-✏️ Editar Reserva (RF06)
+ Editar Reserva (RF06)
  Usuário não autenticado → 401 Unauthorized
  Reservation_id não fornecido → 400 Bad Request
  Reservation_id inválido → 400 Bad Request
@@ -450,7 +820,7 @@ Gerenciar:
  Erro ao atualizar banco → 500 Internal Server Error + log
  Atualizar timestamp de modificação
  Retornar reserva atualizada
-❌ Cancelar Reserva (RN03)
+ Cancelar Reserva (RN03)
  Usuário não autenticado → 401 Unauthorized
  Reservation_id não fornecido → 400 Bad Request
  Reservation_id inválido → 400 Bad Request
@@ -475,7 +845,7 @@ Gerenciar:
  Erro ao atualizar → 500 Internal Server Error + log
  Deletar notificação → similar
  Retornar notificações ordenadas por data (mais recentes primeiro)
-🔐 Autenticação (Middleware)
+ Autenticação (Middleware)
  Header Authorization ausente → 401 Unauthorized
  Formato do header inválido (não é "Bearer <token>") → 401 Unauthorized
  Token inválido (não JWT válido) → 401 Unauthorized
@@ -483,11 +853,11 @@ Gerenciar:
  Payload do token corrompido → 401 Unauthorized
  Secret key errado → log de erro (não deveria acontecer)
  Retornar usuário decodificado no req.user
-🔒 Autorização (Por rota)
+ Autorização (Por rota)
  Usuário sem role de admin em rota admin → 403 Forbidden
  Usuário tentando acessar recurso de outro → 403 Forbidden
  Log de tentativas de acesso não autorizado
-⚙️ Validação de Entrada (Global)
+ Validação de Entrada (Global)
  SQL Injection → sanitizar inputs, usar prepared statements
  XSS → escapar/validar strings antes de retornar
  Campos extra na requisição → ignorar (não erro)
@@ -503,7 +873,7 @@ Gerenciar:
  Timeout de query → 500 Internal Server Error + log
  Espaço em disco cheio → 500 Internal Server Error + alerta
  Transação falhou → rollback automático + log
-🌐 Rede e Performance
+ Rede e Performance
  Rate limiting → 429 Too Many Requests (máx 100 req/min por IP)
  Request muito grande → 413 Payload Too Large
  Headers ausentes obrigatórios → 400 Bad Request
@@ -511,7 +881,7 @@ Gerenciar:
  Log de todas as requisições (info)
  Log de todos os erros (error)
  Tempo de resposta muito alto → log (warning)
-📝 Erros Internos com Log
+ Erros Internos com Log
  Todos os 500 → log com stack trace + ID de erro
  Retry automático para operações críticas
  Alerta ao team se muitos erros em curto período

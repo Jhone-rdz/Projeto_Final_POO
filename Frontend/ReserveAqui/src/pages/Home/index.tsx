@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 
 /**
  * Página Home - Tela inicial do sistema
- * Design: ReservaFácil — tema escuro/dourado inspirado nas imagens de referência
+ * Design: ReserveAqui — tema escuro/dourado inspirado nas imagens de referência
  */
 export const Home = () => {
   const [restaurantes, setRestaurantes] = useState<Restaurante[]>([]);
@@ -88,7 +88,7 @@ export const Home = () => {
           </p>
 
           <button
-            onClick={() => navigate('/restaurants')}
+            onClick={() => navigate('/restaurantes/1')}
             style={{
               backgroundColor: '#C9922A',
               color: '#fff',
@@ -194,16 +194,7 @@ export const Home = () => {
                 ))}
               </div>
 
-              <div className="text-center">
-                <Button
-                  variant="primary"
-                  size="md"
-                  onClick={() => navigate('/restaurants')}
-                  className="!bg-amber-600 hover:!bg-amber-700"
-                >
-                  Ver Todos os Restaurantes
-                </Button>
-              </div>
+
             </>
           )}
 

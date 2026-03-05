@@ -64,6 +64,15 @@ export const mesasService = {
       horario,
       quantidade_pessoas: quantidadePessoas,
     });
-    return response.data;
+    
+    // Transformar resposta do backend para formato esperado pelo frontend
+    const data = response.data;
+    return {
+      disponivel: data.mesas_disponiveis_suficientes === true && data.total_mesas_disponiveis > 0,
+      mesas_necessarias: data.mesas_necessarias || 0,
+      mensagem: data.total_mesas_disponiveis > 0 
+        ? `${data.total_mesas_disponiveis} mesa(s) disponível(is)` 
+        : 'Nenhuma mesa disponível',
+    };
   },
 };

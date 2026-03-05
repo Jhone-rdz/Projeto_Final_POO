@@ -8,7 +8,7 @@ import { useAuth } from '../../context';
 const GOLD = '#C9922A';
 
 /**
- * Página de Realização de Reserva — tema ReservaFácil
+ * Página de Realização de Reserva — tema ReserveAqui
  */
 const Reserva = () => {
   const { id } = useParams<{ id: string }>();
@@ -70,7 +70,8 @@ const Reserva = () => {
         Number(id), formData.data, formData.horario, Number(formData.quantidadePessoas)
       );
       setMesasDisponibilidade(disponibilidade);
-    } catch {
+    } catch (err: any) {
+      console.error('Erro ao verificar disponibilidade:', err.response?.data || err.message);
       setMesasDisponibilidade(null);
     }
   };
@@ -88,10 +89,15 @@ const Reserva = () => {
       setErro('Nenhuma mesa disponível para este horário');
       return;
     }
-    const dataReserva = new Date(formData.data);
+
+    // Validar data: deve ser futura (hoje ou depois)
     const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    if (dataReserva < hoje) {
+    const dataReservaStr = formData.data; // formato YYYY-MM-DD
+    const hojeStr = hoje.getFullYear().toString().padStart(4, '0') + 
+                    '-' + (hoje.getMonth() + 1).toString().padStart(2, '0') + 
+                    '-' + hoje.getDate().toString().padStart(2, '0');
+    
+    if (dataReservaStr < hojeStr) {
       setErro('Selecione uma data futura');
       return;
     }
@@ -110,7 +116,7 @@ const Reserva = () => {
       });
       setSuccesso(true);
       setSucessoMsg(`Suas reserva no ${restaurante?.nome} foi confirmada`);
-      setTimeout(() => navigate('/reservations'), 2500);
+      setTimeout(() => navigate('/profile'), 2500);
     } catch {
       setErro('Erro ao processar sua reserva. Tente novamente.');
     } finally {
@@ -273,7 +279,7 @@ const Reserva = () => {
       {/* Título */}
       <h1 style={{ fontSize: '1.8rem', fontWeight: 700, color: '#1a1a1a', marginBottom: 4 }}>Fazer reserva</h1>
       <p style={{ color: '#1a1a1a', fontWeight: 600, marginBottom: 24, fontSize: '0.95rem' }}>
-        {restaurante?.nome} • {mesasCount} mesas disponíveis
+        {restaurante?.nome} • {mesasDisponibilidade ? `${mesasDisponibilidade.mensagem}` : `${restaurante?.quantidade_mesas || 0} mesas`}
       </p>
 
       {/* Card do formulário */}
@@ -334,10 +340,18 @@ const Reserva = () => {
           </div>
 
           {/* Disponibilidade inline */}
-          {mesasDisponibilidade?.disponivel && (
-            <div style={{ backgroundColor: '#f0f9f4', border: '1px solid #b7dfc8', borderRadius: 8, padding: '12px 16px', marginBottom: 20, fontSize: '0.9rem', color: '#1a5c35', fontWeight: 500 }}>
-              ✅ {mesasDisponibilidade.mesas_necessarias} mesas disponíveis para {formData.quantidadePessoas} pessoa(s) em {formData.data} às {formData.horario}
-            </div>
+          {formData.data && formData.horario && formData.quantidadePessoas && mesasDisponibilidade && (
+            <>
+              {mesasDisponibilidade?.disponivel ? (
+                <div style={{ backgroundColor: '#f0f9f4', border: '1px solid #b7dfc8', borderRadius: 8, padding: '12px 16px', marginBottom: 20, fontSize: '0.9rem', color: '#1a5c35', fontWeight: 500 }}>
+                  ✅ {mesasDisponibilidade.mesas_necessarias} mesa(s) necessária(s) para {formData.quantidadePessoas} pessoa(s) - {mesasDisponibilidade.mensagem}
+                </div>
+              ) : (
+                <div style={{ backgroundColor: '#fef3f3', border: '1px solid #e5b7b7', borderRadius: 8, padding: '12px 16px', marginBottom: 20, fontSize: '0.9rem', color: '#8b3838', fontWeight: 500 }}>
+                  ❌ {mesasDisponibilidade.mensagem} para {formData.quantidadePessoas} pessoa(s) em {formData.data} às {formData.horario}. Tente outro horário.
+                </div>
+              )}
+            </>
           )}
 
           {/* Botão confirmar */}

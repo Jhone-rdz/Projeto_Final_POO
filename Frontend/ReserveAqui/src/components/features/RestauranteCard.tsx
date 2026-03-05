@@ -16,7 +16,7 @@ interface RestauranteCardProps {
 }
 
 /**
- * Card de Restaurante — tema ReservaFácil
+ * Card de Restaurante — tema ReserveAqui
  */
 export const RestauranteCard: React.FC<RestauranteCardProps> = ({
   id,
@@ -133,7 +133,7 @@ export const RestauranteCard: React.FC<RestauranteCardProps> = ({
         <div className="flex items-center justify-between mt-auto pt-3" style={{ borderTop: '1px solid #f0e8dc' }}>
           {mesasDisponiveis !== undefined ? (
             <span style={{ color: GOLD, fontSize: '0.9rem', fontWeight: 600 }}>
-              {mesasDisponiveis} mesa{mesasDisponiveis !== 1 ? 's' : ''} disponíve{mesasDisponiveis !== 1 ? 'is' : 'l'}
+              {mesasDisponiveis} mesa{mesasDisponiveis !== 1 ? 's' : ''}
             </span>
           ) : (
             <span />

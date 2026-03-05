@@ -9,7 +9,7 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 
 /**
- * Componente de Input reutilizável — tema ReservaFácil
+ * Componente de Input reutilizável — tema ReserveAqui
  */
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, helperText, className = '', style, ...props }, ref) => {

@@ -1,7 +1,7 @@
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from datetime import timedelta
+from datetime import datetime, timedelta
 import math
 from usuarios.models import Usuario
 from restaurantes.models import Restaurante
@@ -88,11 +88,11 @@ class Reserva(models.Model):
         if self.status in ['cancelada', 'concluida']:
             return False
         
-        # Permite cancelar até 2 horas antes da reserva
+        # Permite cancelar até 30 minutos antes da reserva
         data_hora_reserva = timezone.make_aware(
-            timezone.datetime.combine(self.data_reserva, self.horario)
+            datetime.combine(self.data_reserva, self.horario)
         )
-        limite_cancelamento = data_hora_reserva - timedelta(hours=2)
+        limite_cancelamento = data_hora_reserva - timedelta(minutes=30)
         
         return timezone.now() < limite_cancelamento
     
@@ -100,16 +100,16 @@ class Reserva(models.Model):
         """Validações do modelo"""
         super().clean()
         
-        # RN01: Reserva deve ser feita com no mínimo 2 horas de antecedência
+        # RN01: Reserva deve ser feita com no mínimo 30 minutos de antecedência
         if self.data_reserva and self.horario:
             data_hora_reserva = timezone.make_aware(
-                timezone.datetime.combine(self.data_reserva, self.horario)
+                datetime.combine(self.data_reserva, self.horario)
             )
-            limite_minimo = timezone.now() + timedelta(hours=2)
+            limite_minimo = timezone.now() + timedelta(minutes=30)
             
             if data_hora_reserva < limite_minimo:
                 raise ValidationError(
-                    'Reservas devem ser feitas com no mínimo 2 horas de antecedência.'
+                    'Reservas devem ser feitas com no mínimo 30 minutos de antecedência.'
                 )
         
         # Validar que quantidade de pessoas é razoável
