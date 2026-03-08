@@ -48,12 +48,13 @@ class RestauranteViewSet(viewsets.ModelViewSet):
         """
         Define permissões específicas por ação:
         - list, retrieve: Públicas (permite visualização sem autenticação)
-        - create: Requer autenticação + permissão
+        - create: Requer autenticação + apenas admin_sistema
         - update, partial_update: Requer proprietário ou admin
         - destroy: Requer admin_sistema
         """
         if self.action == 'create':
-            return [IsAuthenticated(), IsAdminOrReadOnly()]
+               # Apenas admin_sistema pode cadastrar novo restaurante
+               return [IsAuthenticated(), IsAdminSystemOnly()]
         elif self.action in ['update', 'partial_update']:
             return [IsAuthenticated(), IsProprietarioOrAdmin()]
         elif self.action == 'destroy':

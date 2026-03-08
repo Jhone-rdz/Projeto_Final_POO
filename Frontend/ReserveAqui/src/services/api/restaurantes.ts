@@ -38,7 +38,7 @@ export const restaurantesService = {
    * Atualizar restaurante
    */
   async atualizar(id: number, data: Partial<CriarRestauranteDTO>): Promise<Restaurante> {
-    const response = await api.put(`/restaurantes/${id}/`, data);
+    const response = await api.patch(`/restaurantes/${id}/`, data);
     return response.data;
   },
 

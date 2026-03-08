@@ -35,6 +35,7 @@ class ReservaViewSet(viewsets.ModelViewSet):
     search_fields = ['nome_cliente', 'telefone_cliente', 'email_cliente']
     ordering_fields = ['data_reserva', 'horario', 'data_criacao']
     ordering = ['-data_reserva', '-horario']
+    STATUS_VISUALIZACAO_RESTAURANTE = ['pendente', 'confirmada']
     
     def get_serializer_class(self):
         """Retorna o serializer apropriado para cada ação"""
@@ -75,7 +76,10 @@ class ReservaViewSet(viewsets.ModelViewSet):
             from restaurantes.models import Restaurante
             seu_restaurante = Restaurante.objects.filter(proprietario=user).first()
             if seu_restaurante:
-                return queryset.filter(restaurante=seu_restaurante)
+                queryset_restaurante = queryset.filter(restaurante=seu_restaurante)
+                if self.action == 'list':
+                    return queryset_restaurante.filter(status__in=self.STATUS_VISUALIZACAO_RESTAURANTE)
+                return queryset_restaurante
             return queryset.none()
         
         # Funcionário: vê reservas do restaurante onde trabalha
@@ -91,17 +95,130 @@ class ReservaViewSet(viewsets.ModelViewSet):
             ).values_list('restaurante_id', flat=True)
             
             if restaurantes_ids:
-                return queryset.filter(restaurante_id__in=restaurantes_ids)
+                queryset_funcionario = queryset.filter(restaurante_id__in=restaurantes_ids)
+                if self.action == 'list':
+                    return queryset_funcionario.filter(status__in=self.STATUS_VISUALIZACAO_RESTAURANTE)
+                return queryset_funcionario
             return queryset.none()
         
         # Cliente: vê apenas suas próprias reservas
         return queryset.filter(usuario=user)
+
+    def _resolver_restaurante_id_relatorio(self, request):
+        """
+        Resolve o restaurante permitido para endpoints de relatório.
+
+        Regras:
+        - admin_sistema: pode consultar qualquer restaurante (ou todos se não informar).
+        - admin_secundario: apenas seu próprio restaurante.
+        - funcionario: apenas restaurante(s) onde está vinculado.
+        """
+        from restaurantes.models import Restaurante, RestauranteUsuario
+
+        user = request.user
+        restaurante_id_param = request.query_params.get('restaurante_id')
+
+        restaurante_id = None
+        if restaurante_id_param:
+            try:
+                restaurante_id = int(restaurante_id_param)
+            except (TypeError, ValueError):
+                return None, Response(
+                    {'error': 'restaurante_id inválido'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        is_admin_sistema = user.usuariopapel_set.filter(
+            papel__tipo='admin_sistema'
+        ).exists()
+        if is_admin_sistema:
+            return restaurante_id, None
+
+        is_admin_secundario = user.usuariopapel_set.filter(
+            papel__tipo='admin_secundario'
+        ).exists()
+        if is_admin_secundario:
+            restaurante_ids = list(
+                Restaurante.objects.filter(proprietario=user).values_list('id', flat=True)
+            )
+
+            if not restaurante_ids:
+                return None, Response(
+                    {'error': 'Nenhum restaurante vinculado ao proprietário.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            if restaurante_id and restaurante_id not in restaurante_ids:
+                return None, Response(
+                    {'error': 'Você não tem acesso a este restaurante.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            return restaurante_id or restaurante_ids[0], None
+
+        is_funcionario = user.usuariopapel_set.filter(
+            papel__tipo='funcionario'
+        ).exists()
+        if is_funcionario:
+            restaurante_ids = list(
+                RestauranteUsuario.objects.filter(
+                    usuario=user,
+                    papel='funcionario'
+                ).values_list('restaurante_id', flat=True)
+            )
+
+            if not restaurante_ids:
+                return None, Response(
+                    {'error': 'Você não está vinculado a nenhum restaurante.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            if restaurante_id and restaurante_id not in restaurante_ids:
+                return None, Response(
+                    {'error': 'Você não tem acesso a este restaurante.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            return restaurante_id or restaurante_ids[0], None
+
+        return None, Response(
+            {'error': 'Você não tem permissão para visualizar relatórios.'},
+            status=status.HTTP_403_FORBIDDEN
+        )
     
     def create(self, request, *args, **kwargs):
         """
         Criar nova reserva com alocação automática de mesas.
-        Valida conflitos e disponibilidade.
+        Valida conflitos, disponibilidade e data/hora no passado.
         """
+        # Validação prévia de data/hora
+        data_reserva_str = request.data.get('data_reserva')
+        horario_str = request.data.get('horario')
+        
+        if data_reserva_str and horario_str:
+            try:
+                from datetime import datetime
+                data_reserva = datetime.strptime(data_reserva_str, '%Y-%m-%d').date()
+                horario = datetime.strptime(horario_str, '%H:%M:%S').time() if ':' in horario_str else datetime.strptime(horario_str, '%H:%M').time()
+                data_hora_reserva = timezone.make_aware(
+                    datetime.combine(data_reserva, horario)
+                )
+                
+                # Você NÃO pode fazer reservas para antes da data/hora atual + 30 minutos
+                limite_minimo = timezone.now() + timedelta(minutes=30)
+                
+                if data_hora_reserva < limite_minimo:
+                    return Response(
+                        {
+                            'error': 'Data e horário inválidos',
+                            'detail': 'Reservas devem ser feitas com no mínimo 30 minutos de antecedência. '
+                                     f'Próximo horário disponível: {(timezone.now() + timedelta(minutes=30)).strftime("%d/%m/%Y às %H:%M")}'
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            except (ValueError, TypeError):
+                pass  # Deixar o serializer validar o formato
+        
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
@@ -313,6 +430,9 @@ class ReservaViewSet(viewsets.ModelViewSet):
                     {'error': 'Não é possível cancelar reservas com menos de 30 minutos de antecedência.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
+
+        # Capturar mesas antes de liberar vínculos para compor a notificação
+        mesas_numeros = [str(m.numero) for m in reserva.mesas.all()]
         
         # RN03: Liberar mesas automaticamente
         ReservaMesa.objects.filter(reserva=reserva).delete()
@@ -320,6 +440,19 @@ class ReservaViewSet(viewsets.ModelViewSet):
         # Atualizar status
         reserva.status = 'cancelada'
         reserva.save(skip_validation=True)
+
+        # Notificar cliente quando houver usuário associado
+        if reserva.usuario:
+            origem_cancelamento = 'você' if is_dono else user.nome
+            Notificacao.objects.create(
+                usuario=reserva.usuario,
+                reserva=reserva,
+                tipo='cancelamento',
+                titulo=f'Reserva Cancelada - {reserva.restaurante.nome}',
+                mensagem=f'Sua reserva em {reserva.restaurante.nome} para {reserva.data_reserva} às '
+                         f'{reserva.horario} foi cancelada por {origem_cancelamento}. '
+                         f'Mesas: {", ".join(mesas_numeros) if mesas_numeros else "-"}'
+            )
         
         serializer = ReservaSerializer(reserva)
         return Response({
@@ -378,6 +511,17 @@ class ReservaViewSet(viewsets.ModelViewSet):
         # Concluir reserva
         reserva.status = 'concluida'
         reserva.save(skip_validation=True)
+
+        # Notificar cliente quando houver usuário associado
+        if reserva.usuario:
+            Notificacao.objects.create(
+                usuario=reserva.usuario,
+                reserva=reserva,
+                tipo='atualizacao',
+                titulo=f'Reserva Concluída - {reserva.restaurante.nome}',
+                mensagem=f'Sua reserva em {reserva.restaurante.nome} para {reserva.data_reserva} às '
+                         f'{reserva.horario} foi marcada como concluída.'
+            )
         
         serializer = ReservaSerializer(reserva)
         return Response({
@@ -472,7 +616,13 @@ class ReservaViewSet(viewsets.ModelViewSet):
         queryset = Reserva.objects.filter(
             restaurante=restaurante,
             data_reserva=hoje
-        ).order_by('horario')
+        )
+
+        # Para usuários do restaurante, exibir apenas reservas ativas/pendentes.
+        if not is_admin_sistema:
+            queryset = queryset.filter(status__in=self.STATUS_VISUALIZACAO_RESTAURANTE)
+
+        queryset = queryset.order_by('horario')
         
         serializer = ReservaListSerializer(queryset, many=True)
         return Response(serializer.data)
@@ -511,26 +661,18 @@ class ReservaViewSet(viewsets.ModelViewSet):
     def ocupacao(self, request):
         """
         RF13: Relatório de ocupação de mesas.
-        Apenas para admins.
+        Disponível para admins e funcionários vinculados.
         
         Query params:
         - restaurante_id: filtrar por restaurante
         - data_inicio: data de início (YYYY-MM-DD)
         - data_fim: data de fim (YYYY-MM-DD)
         """
-        # Verificar se é admin
-        is_admin = request.user.usuariopapel_set.filter(
-            papel__tipo__in=['admin_sistema', 'admin_secundario']
-        ).exists()
-        
-        if not is_admin:
-            return Response(
-                {'error': 'Apenas administradores podem visualizar relatórios.'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
         # Extrair parâmetros
-        restaurante_id = request.query_params.get('restaurante_id')
+        restaurante_id, erro_response = self._resolver_restaurante_id_relatorio(request)
+        if erro_response:
+            return erro_response
+
         data_inicio_str = request.query_params.get('data_inicio')
         data_fim_str = request.query_params.get('data_fim')
         
@@ -576,7 +718,7 @@ class ReservaViewSet(viewsets.ModelViewSet):
     def horarios_movimentados(self, request):
         """
         RF13: Relatório de horários mais movimentados.
-        Apenas para admins.
+        Disponível para admins e funcionários vinculados.
         
         Query params:
         - restaurante_id: filtrar por restaurante
@@ -584,19 +726,11 @@ class ReservaViewSet(viewsets.ModelViewSet):
         - data_fim: data de fim (YYYY-MM-DD), padrão: hoje
         - top: quantidade de horários a retornar (padrão: 10)
         """
-        # Verificar se é admin
-        is_admin = request.user.usuariopapel_set.filter(
-            papel__tipo__in=['admin_sistema', 'admin_secundario']
-        ).exists()
-        
-        if not is_admin:
-            return Response(
-                {'error': 'Apenas administradores podem visualizar relatórios.'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
         # Extrair parâmetros
-        restaurante_id = request.query_params.get('restaurante_id')
+        restaurante_id, erro_response = self._resolver_restaurante_id_relatorio(request)
+        if erro_response:
+            return erro_response
+
         data_inicio_str = request.query_params.get('data_inicio')
         data_fim_str = request.query_params.get('data_fim')
         top = int(request.query_params.get('top', 10))
@@ -644,7 +778,7 @@ class ReservaViewSet(viewsets.ModelViewSet):
     def estatisticas_periodo(self, request):
         """
         RF13: Estatísticas por período (dia, semana, mês).
-        Apenas para admins.
+        Disponível para admins e funcionários vinculados.
         
         Query params:
         - restaurante_id: filtrar por restaurante
@@ -652,19 +786,11 @@ class ReservaViewSet(viewsets.ModelViewSet):
         - data_fim: data de fim (YYYY-MM-DD), padrão: hoje
         - tipo_periodo: 'dia', 'semana' ou 'mes' (padrão: 'dia')
         """
-        # Verificar se é admin
-        is_admin = request.user.usuariopapel_set.filter(
-            papel__tipo__in=['admin_sistema', 'admin_secundario']
-        ).exists()
-        
-        if not is_admin:
-            return Response(
-                {'error': 'Apenas administradores podem visualizar relatórios.'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
         # Extrair parâmetros
-        restaurante_id = request.query_params.get('restaurante_id')
+        restaurante_id, erro_response = self._resolver_restaurante_id_relatorio(request)
+        if erro_response:
+            return erro_response
+
         data_inicio_str = request.query_params.get('data_inicio')
         data_fim_str = request.query_params.get('data_fim')
         tipo_periodo = request.query_params.get('tipo_periodo', 'dia')

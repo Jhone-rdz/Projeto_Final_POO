@@ -87,10 +87,12 @@ class RelatorioHelper:
                 ).count()
                 
                 # Contar mesas ocupadas (usar ReservaMesa)
+                # INCLUIR 'concluida' para ocupação histórica
+                # Conta mesas únicas que foram usadas neste dia
                 mesas_ocupadas = ReservaMesa.objects.filter(
                     reserva__restaurante=restaurante,
                     reserva__data_reserva=data_atual,
-                    reserva__status__in=['pendente', 'confirmada']
+                    reserva__status__in=['pendente', 'confirmada', 'concluida']
                 ).values('mesa_id').distinct().count()
                 
                 # Contar reservas pendentes
@@ -100,7 +102,8 @@ class RelatorioHelper:
                     status='pendente'
                 ).count()
                 
-                # Calcular percentual
+                # Calcular percentual de mesas utilizadas
+                # Representa quantas mesas foram usadas vs total disponível
                 percentual = (mesas_ocupadas / total_mesas * 100) if total_mesas > 0 else 0
                 
                 relatorio.append({
@@ -123,6 +126,7 @@ class RelatorioHelper:
         """
         Gera relatório de horários mais movimentados.
         Identifica os horários com maior número de reservas.
+        Inclui pendentes, confirmadas e concluídas para capturar histórico de ocupação.
         """
         # Filtros padrão
         if not data_inicio:
@@ -130,11 +134,11 @@ class RelatorioHelper:
         if not data_fim:
             data_fim = timezone.now().date()
         
-        # Buscar reservas no período
+        # Buscar reservas no período (incluir concluidas para capturar picos reais)
         reservas_qs = Reserva.objects.filter(
             data_reserva__gte=data_inicio,
             data_reserva__lte=data_fim,
-            status__in=['pendente', 'confirmada']
+            status__in=['pendente', 'confirmada', 'concluida']
         )
         
         if restaurante_id:

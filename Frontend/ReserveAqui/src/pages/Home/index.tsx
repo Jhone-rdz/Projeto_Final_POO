@@ -1,10 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Header, Footer } from '../../components/layout';
 import { RestauranteCard } from '../../components/features';
 import { restaurantesService } from '../../services/api';
 import type { Restaurante } from '../../types';
-import { Button } from '../../components/common';
-import { useNavigate } from 'react-router-dom';
 
 /**
  * Página Home - Tela inicial do sistema
@@ -14,16 +12,14 @@ export const Home = () => {
   const [restaurantes, setRestaurantes] = useState<Restaurante[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
-  const navigate = useNavigate();
+  const destaquesRef = useRef<HTMLElement | null>(null);
 
-  useEffect(() => {
-    carregarRestaurantes();
-  }, []);
-
-  const carregarRestaurantes = async () => {
+  const carregarRestaurantes = useCallback(async (silencioso = false) => {
     try {
-      setCarregando(true);
-      setErro('');
+      if (!silencioso) {
+        setCarregando(true);
+        setErro('');
+      }
       const resposta = await restaurantesService.listar({ page: 1 });
       const payload = resposta as unknown;
       const lista = Array.isArray(payload)
@@ -32,10 +28,38 @@ export const Home = () => {
       setRestaurantes(lista);
     } catch (error) {
       console.error('Erro ao carregar restaurantes:', error);
-      setErro('Não foi possível carregar os restaurantes. Tente novamente mais tarde.');
+      if (!silencioso) {
+        setErro('Não foi possível carregar os restaurantes. Tente novamente mais tarde.');
+      }
     } finally {
-      setCarregando(false);
+      if (!silencioso) setCarregando(false);
     }
+  }, []);
+
+  useEffect(() => {
+    carregarRestaurantes();
+  }, [carregarRestaurantes]);
+
+  useEffect(() => {
+    const atualizar = () => {
+      if (document.visibilityState === 'visible') {
+        carregarRestaurantes(true);
+      }
+    };
+
+    const intervalId = window.setInterval(atualizar, 15000);
+    window.addEventListener('focus', atualizar);
+    document.addEventListener('visibilitychange', atualizar);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', atualizar);
+      document.removeEventListener('visibilitychange', atualizar);
+    };
+  }, [carregarRestaurantes]);
+
+  const handleVerRestaurantes = () => {
+    destaquesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   return (
@@ -88,7 +112,7 @@ export const Home = () => {
           </p>
 
           <button
-            onClick={() => navigate('/restaurantes/1')}
+            onClick={handleVerRestaurantes}
             style={{
               backgroundColor: '#C9922A',
               color: '#fff',
@@ -119,7 +143,7 @@ export const Home = () => {
       </section>
 
       {/* ── Seção de Restaurantes em Destaque ── */}
-      <section className="w-full py-16 px-4" style={{ backgroundColor: '#F5F0EA' }}>
+      <section ref={destaquesRef} className="w-full py-16 px-4" style={{ backgroundColor: '#F5F0EA' }}>
         <div className="w-full max-w-7xl mx-auto">
 
           {/* Título da seção */}
@@ -168,7 +192,7 @@ export const Home = () => {
             >
               <p style={{ color: '#7a5a00', fontWeight: 600 }}>{erro}</p>
               <button
-                onClick={carregarRestaurantes}
+                onClick={() => carregarRestaurantes()}
                 className="mt-4 underline font-semibold"
                 style={{ color: '#C9922A', background: 'none', border: 'none', cursor: 'pointer' }}
               >

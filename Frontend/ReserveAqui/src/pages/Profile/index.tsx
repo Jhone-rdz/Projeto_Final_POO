@@ -25,7 +25,7 @@ const Profile = () => {
   const [reservaCancelamento, setReservaCancelamento] = useState<Reserva | null>(null);
   const [motivoCancelamento, setMotivoCancelamento] = useState('');
   const [modalEdicaoReserva, setModalEdicaoReserva] = useState(false);
-  const [reservaEdicao, setReservaEdicao] = useState<Reserva | null>(null);
+  const [reservaEdicao] = useState<Reserva | null>(null);
   const [formReserva, setFormReserva] = useState({ data_reserva: '', horario: '', quantidade_pessoas: '' });
   const [erro, setErro] = useState('');
   const [sucesso, setSuccesso] = useState('');
@@ -41,9 +41,9 @@ const Profile = () => {
   const btnGold: React.CSSProperties = { backgroundColor: GOLD, border: 'none', color: '#fff', borderRadius: 8, padding: '9px 22px', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer' };
   const btnOutline: React.CSSProperties = { backgroundColor: 'transparent', border: '1.5px solid #ccc', color: '#555', borderRadius: 8, padding: '8px 18px', fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer' };
 
-  const carregarReservas = useCallback(async () => {
+  const carregarReservas = useCallback(async (silencioso = false) => {
     try {
-      setCarregandoReservas(true);
+      if (!silencioso) setCarregandoReservas(true);
       const response = await reservasService.minhasReservas();
       console.log('Resposta de minhasReservas:', response);
       
@@ -61,10 +61,30 @@ const Profile = () => {
       console.error('Erro ao carregar reservas:', error);
       setErro('Erro ao carregar reservas'); 
     }
-    finally { setCarregandoReservas(false); }
+    finally { if (!silencioso) setCarregandoReservas(false); }
   }, []);
 
   useEffect(() => { carregarReservas(); }, [carregarReservas]);
+
+  // Atualiza reservas em segundo plano para evitar necessidade de F5.
+  useEffect(() => {
+    const atualizar = () => {
+      if (document.visibilityState === 'visible') {
+        carregarReservas(true);
+      }
+    };
+
+    atualizar();
+    const intervalId = window.setInterval(atualizar, 10000);
+    window.addEventListener('focus', atualizar);
+    document.addEventListener('visibilitychange', atualizar);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', atualizar);
+      document.removeEventListener('visibilitychange', atualizar);
+    };
+  }, [carregarReservas]);
 
   const handleSalvarDados = async (e: React.FormEvent) => {
     e.preventDefault();

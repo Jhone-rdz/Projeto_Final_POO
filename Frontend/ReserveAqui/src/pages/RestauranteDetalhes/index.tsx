@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Header, Footer } from '../../components/layout';
 import { restaurantesService, mesasService } from '../../services/api';
@@ -21,12 +21,10 @@ const RestauranteDetalhes = () => {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
 
-  useEffect(() => { if (id) carregarDetalhes(); }, [id]);
-
-  const carregarDetalhes = async () => {
+  const carregarDetalhes = useCallback(async (silencioso = false) => {
     try {
-      setCarregando(true);
-      setErro('');
+      if (!silencioso) setCarregando(true);
+      if (!silencioso) setErro('');
       const restauranteData = await restaurantesService.obter(Number(id));
       setRestaurante(restauranteData);
       if (isAuthenticated) {
@@ -44,11 +42,33 @@ const RestauranteDetalhes = () => {
         setMesas([]);
       }
     } catch {
-      setErro('Não foi possível carregar os detalhes do restaurante.');
+      if (!silencioso) setErro('Não foi possível carregar os detalhes do restaurante.');
     } finally {
-      setCarregando(false);
+      if (!silencioso) setCarregando(false);
     }
-  };
+  }, [id, isAuthenticated]);
+
+  useEffect(() => { if (id) carregarDetalhes(); }, [id, carregarDetalhes]);
+
+  useEffect(() => {
+    if (!id) return;
+
+    const atualizar = () => {
+      if (document.visibilityState === 'visible') {
+        carregarDetalhes(true);
+      }
+    };
+
+    const intervalId = window.setInterval(atualizar, 15000);
+    window.addEventListener('focus', atualizar);
+    document.addEventListener('visibilitychange', atualizar);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', atualizar);
+      document.removeEventListener('visibilitychange', atualizar);
+    };
+  }, [id, isAuthenticated, carregarDetalhes]);
 
   const mesasDisponiveis = isAuthenticated
     ? mesas.filter(m => m.status === 'disponivel').length

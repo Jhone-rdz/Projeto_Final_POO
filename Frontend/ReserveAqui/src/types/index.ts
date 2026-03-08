@@ -160,12 +160,17 @@ export type TipoNotificacao = 'confirmacao' | 'cancelamento' | 'lembranca' | 'at
 
 export interface Notificacao {
   id: number;
-  usuario: number; // ID do usuário
-  reserva: number; // ID da reserva
+  usuario?: number; // compatibilidade
+  reserva?: number; // compatibilidade
   tipo: TipoNotificacao;
+  get_tipo_display?: string;
   titulo: string;
   mensagem: string;
   lido: boolean;
+  reserva_id?: number;
+  reserva_restaurante?: string;
+  reserva_data?: string;
+  reserva_horario?: string;
   data_criacao: string;
   data_leitura?: string | null;
 }
@@ -185,4 +190,61 @@ export interface ApiError {
   detail?: string;
   message?: string;
   [key: string]: any;
+}
+
+// ========================================
+// Relatórios
+// ========================================
+
+export interface RelatorioOcupacaoItem {
+  restaurante_id: number;
+  restaurante_nome: string;
+  data: string;
+  total_mesas: number;
+  mesas_ocupadas: number;
+  percentual_ocupacao: string;
+  reservas_confirmadas: number;
+  reservas_pendentes: number;
+}
+
+export interface RelatorioHorariosItem {
+  restaurante_id: number;
+  restaurante_nome: string;
+  horario: string;
+  total_reservas: number;
+  pessoas_total: number;
+  taxa_confirmacao: string;
+}
+
+export interface RelatorioEstatisticasItem {
+  periodo: string;
+  total_reservas: number;
+  reservas_confirmadas: number;
+  reservas_canceladas: number;
+  reservas_pendentes: number;
+  pessoas_total: number;
+  ticket_medio: string;
+  taxa_cancelamento: string;
+}
+
+export interface RelatorioOcupacaoResponse {
+  periodo_inicio: string;
+  periodo_fim: string;
+  total_registros: number;
+  dados: RelatorioOcupacaoItem[];
+}
+
+export interface RelatorioHorariosResponse {
+  periodo_inicio: string;
+  periodo_fim: string;
+  total_registros: number;
+  dados: RelatorioHorariosItem[];
+}
+
+export interface RelatorioEstatisticasResponse {
+  periodo_inicio: string;
+  periodo_fim: string;
+  tipo_periodo: 'dia' | 'semana' | 'mes';
+  total_registros: number;
+  dados: RelatorioEstatisticasItem[];
 }

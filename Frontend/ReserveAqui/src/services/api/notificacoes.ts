@@ -11,7 +11,7 @@ export const notificacoesService = {
   async listar(params?: {
     page?: number;
     lido?: boolean;
-  }): Promise<PaginatedResponse<Notificacao>> {
+  }): Promise<PaginatedResponse<Notificacao> | Notificacao[]> {
     const response = await api.get('/notificacoes/', { params });
     return response.data;
   },
@@ -27,7 +27,7 @@ export const notificacoesService = {
   /**
    * Marcar notificação como lida
    */
-  async marcarComoLida(id: number): Promise<Notificacao> {
+  async marcarComoLida(id: number): Promise<{ message: string; notificacao: Notificacao }> {
     const response = await api.post(`/notificacoes/${id}/marcar_lida/`);
     return response.data;
   },
@@ -35,7 +35,7 @@ export const notificacoesService = {
   /**
    * Marcar todas as notificações como lidas
    */
-  async marcarTodasComoLidas(): Promise<{ mensagem: string }> {
+  async marcarTodasComoLidas(): Promise<{ message: string; quantidade: number }> {
     const response = await api.post('/notificacoes/marcar_todas_lidas/');
     return response.data;
   },

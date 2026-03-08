@@ -1,5 +1,4 @@
 import { Header, Footer } from '../../../components/layout';
-import { useAuth } from '../../../context';
 import { useEffect, useState, useCallback } from 'react';
 import { mesasService, reservasService, restaurantesService } from '../../../services/api';
 import type { Mesa, Reserva, Restaurante } from '../../../types';
@@ -7,75 +6,180 @@ import type { Mesa, Reserva, Restaurante } from '../../../types';
 const GOLD = '#C9922A';
 const BG = '#F5F0EA';
 
+const extrairLista = <T,>(r: unknown): T[] => {
+  if (Array.isArray(r)) return r;
+  if (r && typeof r === 'object' && 'results' in r) return (r as { results: T[] }).results;
+  return [];
+};
+
+const toISODate = (d: Date) => d.toISOString().slice(0, 10);
+const diasAtrasISO = (dias: number) => {
+  const data = new Date();
+  data.setDate(data.getDate() - dias);
+  return toISODate(data);
+};
+const formatarHora = (valor: string | undefined) => (valor ? valor.slice(0, 5) : '--:--');
+
 /**
  * Dashboard do Funcionário — tema ReserveAqui
  */
 const StaffDashboard = () => {
-  const { usuario } = useAuth();
-
   const [restaurante, setRestaurante] = useState<Restaurante | null>(null);
   const [carregandoRestaurante, setCarregandoRestaurante] = useState(false);
   const [mesas, setMesas] = useState<Mesa[]>([]);
   const [carregandoMesas, setCarregandoMesas] = useState(false);
   const [reservas, setReservas] = useState<Reserva[]>([]);
   const [carregandoReservas, setCarregandoReservas] = useState(false);
-  const [filtroReservas, setFiltroReservas] = useState<'todas' | 'pendente' | 'confirmada' | 'hoje'>('todas');
+  const [carregandoRelatorios, setCarregandoRelatorios] = useState(false);
+  const [resumoRelatorio, setResumoRelatorio] = useState({
+    reservasHoje: 0,
+    confirmadasHoje: 0,
+    pendentesHoje: 0,
+    ocupacaoHoje: 0,
+  });
+  const [horariosPico, setHorariosPico] = useState<Array<{ horario: string; total: number; taxa: string }>>([]);
   const [erro, setErro] = useState('');
   const [sucesso, setSucesso] = useState('');
   const [carregandoAcao, setCarregandoAcao] = useState(false);
 
-  useEffect(() => { carregarDados(); }, []);
-
-  const carregarDados = async () => {
-    await Promise.all([carregarRestaurante(), carregarMesas(), carregarReservas()]);
-  };
-
-  const carregarRestaurante = async () => {
+  const carregarRestaurante = useCallback(async () => {
     try {
       setCarregandoRestaurante(true);
       const response = await restaurantesService.meusRestaurantes();
-      if (response.results?.length > 0) setRestaurante(response.results[0]);
+      const lista = extrairLista<Restaurante>(response);
+      if (lista.length > 0) setRestaurante(lista[0]);
     } catch { setErro('Erro ao carregar restaurante'); }
     finally { setCarregandoRestaurante(false); }
-  };
+  }, []);
 
   const carregarMesas = useCallback(async () => {
     try {
       setCarregandoMesas(true);
       const response = await restaurantesService.meusRestaurantes();
-      if (response.results?.length > 0) {
-        const mesasResponse = await mesasService.listar({ restaurante: response.results[0].id });
-        // Lidar com array direto ou objeto com results
-        const mesas = Array.isArray(mesasResponse) ? mesasResponse : (mesasResponse.results || []);
+      const lista = extrairLista<Restaurante>(response);
+      if (lista.length > 0) {
+        const mesasResponse = await mesasService.listar({ restaurante: lista[0].id });
+        const mesas = extrairLista<Mesa>(mesasResponse);
         setMesas(mesas);
       }
     } catch { setErro('Erro ao carregar mesas'); }
     finally { setCarregandoMesas(false); }
   }, []);
 
-  const carregarReservas = useCallback(async () => {
+  const carregarReservas = useCallback(async (silencioso = false) => {
     try {
-      setCarregandoReservas(true);
+      if (!silencioso) setCarregandoReservas(true);
       const response = await restaurantesService.meusRestaurantes();
-      if (response.results?.length > 0) {
-        const restauranteId = response.results[0].id;
-        if (filtroReservas === 'hoje') {
-          const r = await reservasService.reservasHoje(restauranteId);
-          const reservas = Array.isArray(r) ? r : (r.results || []);
-          setReservas(reservas);
-        } else {
-          const params: any = { restaurante: restauranteId };
-          if (filtroReservas !== 'todas') params.status = filtroReservas;
-          const r = await reservasService.listar(params);
-          const reservas = Array.isArray(r) ? r : (r.results || []);
-          setReservas(reservas);
-        }
+      const lista = extrairLista<Restaurante>(response);
+      if (lista.length > 0) {
+        const restauranteId = lista[0].id;
+        const r = await reservasService.listar({ restaurante: restauranteId });
+        const reservas = extrairLista<Reserva>(r);
+        setReservas(reservas);
       }
     } catch { setErro('Erro ao carregar reservas'); }
-    finally { setCarregandoReservas(false); }
-  }, [filtroReservas]);
+    finally { if (!silencioso) setCarregandoReservas(false); }
+  }, []);
 
-  useEffect(() => { if (restaurante) carregarReservas(); }, [filtroReservas, restaurante, carregarReservas]);
+  const carregarDados = useCallback(async () => {
+    await Promise.all([carregarRestaurante(), carregarMesas(), carregarReservas()]);
+  }, [carregarRestaurante, carregarMesas, carregarReservas]);
+
+  useEffect(() => { carregarDados(); }, [carregarDados]);
+
+  const carregarRelatorios = useCallback(async (silencioso = false) => {
+    if (!restaurante) return;
+
+    try {
+      if (!silencioso) setCarregandoRelatorios(true);
+
+      const hoje = toISODate(new Date());
+      const inicioSemana = diasAtrasISO(7);
+
+      const [reservasHojeResp, ocupacaoResp, horariosResp] = await Promise.all([
+        reservasService.reservasHoje(restaurante.id),
+        reservasService.ocupacao({
+          restaurante_id: restaurante.id,
+          data_inicio: hoje,
+          data_fim: hoje,
+        }),
+        reservasService.horariosMovimentados({
+          restaurante_id: restaurante.id,
+          data_inicio: inicioSemana,
+          data_fim: hoje,
+          top: 5,
+        }),
+      ]);
+
+      const reservasHoje = extrairLista<Reserva>(reservasHojeResp);
+      const confirmadasHoje = reservasHoje.filter(r => r.status === 'confirmada').length;
+      const pendentesHoje = reservasHoje.filter(r => r.status === 'pendente').length;
+      const ocupacaoHoje = Math.round(Number(ocupacaoResp?.dados?.[0]?.percentual_ocupacao || 0));
+
+      setResumoRelatorio({
+        reservasHoje: reservasHoje.length,
+        confirmadasHoje,
+        pendentesHoje,
+        ocupacaoHoje,
+      });
+
+      setHorariosPico((horariosResp?.dados || []).map(item => ({
+        horario: formatarHora(item.horario),
+        total: item.total_reservas,
+        taxa: `${Math.round(Number(item.taxa_confirmacao))}%`,
+      })));
+    } catch {
+      if (!silencioso) setErro('Erro ao carregar relatório operacional');
+    } finally {
+      if (!silencioso) setCarregandoRelatorios(false);
+    }
+  }, [restaurante]);
+
+  useEffect(() => { if (restaurante) carregarReservas(); }, [restaurante, carregarReservas]);
+
+  // Atualização automática das reservas em segundo plano.
+  useEffect(() => {
+    if (!restaurante) return;
+
+    const atualizar = () => {
+      if (document.visibilityState === 'visible') {
+        carregarReservas(true);
+      }
+    };
+
+    atualizar();
+    const intervalId = window.setInterval(atualizar, 10000);
+    window.addEventListener('focus', atualizar);
+    document.addEventListener('visibilitychange', atualizar);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', atualizar);
+      document.removeEventListener('visibilitychange', atualizar);
+    };
+  }, [restaurante, carregarReservas]);
+
+  // Atualização automática dos relatórios operacionais.
+  useEffect(() => {
+    if (!restaurante) return;
+
+    const atualizar = () => {
+      if (document.visibilityState === 'visible') {
+        carregarRelatorios(true);
+      }
+    };
+
+    carregarRelatorios();
+    const intervalId = window.setInterval(atualizar, 20000);
+    window.addEventListener('focus', atualizar);
+    document.addEventListener('visibilitychange', atualizar);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', atualizar);
+      document.removeEventListener('visibilitychange', atualizar);
+    };
+  }, [restaurante, carregarRelatorios]);
 
   const handleAlterarStatusMesa = async (mesa: Mesa) => {
     setErro(''); setSucesso('');
@@ -90,9 +194,11 @@ const StaffDashboard = () => {
     finally { setCarregandoAcao(false); }
   };
 
-  const handleAbrirConfirmacao = (tipo: 'confirmar' | 'cancelar', reserva: Reserva) => {
+  const handleAbrirConfirmacao = (tipo: 'confirmar' | 'concluir' | 'cancelar', reserva: Reserva) => {
     if (tipo === 'confirmar') {
       handleConfirmarReservaDirecto(reserva);
+    } else if (tipo === 'concluir') {
+      handleConcluirReservaDirecto(reserva);
     } else {
       handleCancelarReservaDirecto(reserva);
     }
@@ -120,7 +226,16 @@ const StaffDashboard = () => {
     finally { setCarregandoAcao(false); }
   };
 
-  const formatarData = (data: string) => new Date(data + 'T00:00:00').toLocaleDateString('pt-BR');
+  const handleConcluirReservaDirecto = async (reserva: Reserva) => {
+    try {
+      setCarregandoAcao(true);
+      await reservasService.concluir(reserva.id);
+      setSucesso('Reserva concluída!');
+      carregarReservas();
+      setTimeout(() => setSucesso(''), 3000);
+    } catch { setErro('Erro ao concluir reserva'); }
+    finally { setCarregandoAcao(false); }
+  };
 
   // ── Badge de status da reserva ──
   const statusStyle = (status: string): React.CSSProperties => {
@@ -210,6 +325,7 @@ const StaffDashboard = () => {
         )}
 
         {!carregandoRestaurante && restaurante && (
+          <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
             {/* ── COLUNA ESQUERDA: Mesas ── */}
@@ -313,6 +429,14 @@ const StaffDashboard = () => {
                               Confirmar
                             </button>
                           )}
+                          {reserva.status === 'confirmada' && (
+                            <button
+                              onClick={() => handleAbrirConfirmacao('concluir', reserva)}
+                              style={{ backgroundColor: '#3f3f46', border: 'none', color: '#fff', borderRadius: 7, padding: '6px 16px', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer' }}
+                            >
+                              Concluir
+                            </button>
+                          )}
                           <button
                             onClick={() => handleAbrirConfirmacao('cancelar', reserva)}
                             style={{ backgroundColor: '#e05555', border: 'none', color: '#fff', borderRadius: 7, padding: '6px 16px', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer' }}
@@ -327,6 +451,52 @@ const StaffDashboard = () => {
               )}
             </div>
           </div>
+
+          <div style={{ marginTop: 28 }}>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1a1a1a', marginBottom: 14 }}>
+              Relatório Operacional
+            </h2>
+
+            {carregandoRelatorios ? (
+              <div className="flex justify-center py-10">
+                <div className="animate-spin rounded-full" style={{ width: 32, height: 32, border: '4px solid #e5d9c8', borderTopColor: GOLD }} />
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3" style={{ marginBottom: 12 }}>
+                  {[
+                    { label: 'Reservas Hoje', valor: resumoRelatorio.reservasHoje },
+                    { label: 'Confirmadas Hoje', valor: resumoRelatorio.confirmadasHoje },
+                    { label: 'Pendentes Hoje', valor: resumoRelatorio.pendentesHoje },
+                    { label: 'Ocupação Hoje', valor: `${resumoRelatorio.ocupacaoHoje}%` },
+                  ].map(item => (
+                    <div key={item.label} style={{ backgroundColor: '#fff', border: '1px solid #e5ddd5', borderRadius: 10, padding: '14px 16px' }}>
+                      <p style={{ color: GOLD, fontWeight: 700, fontSize: '1.45rem', lineHeight: 1, marginBottom: 6 }}>{item.valor}</p>
+                      <p style={{ color: '#666', fontSize: '0.82rem' }}>{item.label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ backgroundColor: '#fff', border: '1px solid #e5ddd5', borderRadius: 10, padding: '14px 16px' }}>
+                  <p style={{ fontWeight: 700, color: '#1a1a1a', marginBottom: 10 }}>Horários mais movimentados (7 dias)</p>
+                  {horariosPico.length === 0 ? (
+                    <p style={{ color: '#888', fontSize: '0.9rem' }}>Sem dados suficientes no período.</p>
+                  ) : (
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      {horariosPico.map(item => (
+                        <div key={item.horario} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #f0e9df', borderRadius: 8, padding: '8px 10px' }}>
+                          <span style={{ fontWeight: 700, color: '#333' }}>{item.horario}</span>
+                          <span style={{ color: '#666', fontSize: '0.84rem' }}>{item.total} reserva(s)</span>
+                          <span style={{ color: GOLD, fontWeight: 700, fontSize: '0.84rem' }}>{item.taxa} conf.</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+          </>
         )}
       </main>
 

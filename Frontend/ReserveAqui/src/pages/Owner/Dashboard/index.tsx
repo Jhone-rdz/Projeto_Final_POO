@@ -24,6 +24,17 @@ const labelStyle: React.CSSProperties = { display: 'block', color: '#1a1a1a', fo
 const btnGold: React.CSSProperties = { backgroundColor: GOLD, border: 'none', color: '#fff', borderRadius: 8, padding: '9px 22px', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer' };
 const btnOutline: React.CSSProperties = { backgroundColor: 'transparent', border: '1.5px solid #ccc', color: '#555', borderRadius: 8, padding: '8px 18px', fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer' };
 const cardStyle: React.CSSProperties = { border: '1px solid #e5ddd5', borderRadius: 10, padding: '14px 18px', backgroundColor: '#fff' };
+const toISODate = (d: Date) => d.toISOString().slice(0, 10);
+const diasAtrasISO = (dias: number) => {
+  const data = new Date();
+  data.setDate(data.getDate() - dias);
+  return toISODate(data);
+};
+const formatarHora = (valor: string | undefined) => (valor ? valor.slice(0, 5) : '--:--');
+const abreviarData = (dataISO: string) => {
+  const data = new Date(`${dataISO}T00:00:00`);
+  return data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+};
 
 /**
  * Dashboard do Proprietário — tema ReserveAqui (todas as abas em 1 arquivo)
@@ -34,7 +45,6 @@ const OwnerDashboard = () => {
 
   // ── Restaurante ──
   const [restaurante, setRestaurante] = useState<Restaurante | null>(null);
-  const [carregandoRestaurante, setCarregandoRestaurante] = useState(false);
   const [formRestaurante, setFormRestaurante] = useState({ nome: '', localizacao: '', descricao: '', horario: '' });
 
   // ── Mesas ──
@@ -44,6 +54,16 @@ const OwnerDashboard = () => {
   // ── Reservas ──
   const [reservas, setReservas] = useState<Reserva[]>([]);
   const [carregandoReservas, setCarregandoReservas] = useState(false);
+
+  // ── Relatórios ──
+  const [carregandoRelatorios, setCarregandoRelatorios] = useState(false);
+  const [kpisRelatorio, setKpisRelatorio] = useState({
+    taxaOcupacaoMedia: 0,
+    horarioPico: '--:--',
+    reservasMesAtual: 0,
+  });
+  const [dadosDia, setDadosDia] = useState<Array<{ dia: string; taxa: number }>>([]);
+  const [dadosMes, setDadosMes] = useState<Array<{ mes: string; reservas: number }>>([]);
 
   // ── Funcionários ──
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
@@ -63,28 +83,17 @@ const OwnerDashboard = () => {
   const [carregandoAcao, setCarregandoAcao] = useState(false);
 
   const feedback = (ok: string) => { setSucesso(ok); setTimeout(() => setSucesso(''), 3000); };
-  const fmtData = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('pt-BR');
 
-  // ── Dados iniciais ──
-  useEffect(() => { carregarTudo(); }, []);
-
-  const carregarTudo = async () => {
-    await Promise.all([carregarRestaurante(), carregarMesas(), carregarReservas()]);
-    carregarFuncionariosMock();
-  };
-
-  const carregarRestaurante = async () => {
+  const carregarRestaurante = useCallback(async () => {
     try {
-      setCarregandoRestaurante(true);
       const r = await restaurantesService.meusRestaurantes();
       const lista = extrairLista<Restaurante>(r);
       if (lista.length > 0) {
         setRestaurante(lista[0]);
-        setFormRestaurante({ nome: lista[0].nome || '', localizacao: lista[0].endereco || '', descricao: lista[0].descricao || '', horario: `${lista[0].horario_abertura || '11:00'} - ${lista[0].horario_fechamento || '23:00'}` });
+        setFormRestaurante({ nome: lista[0].nome || '', localizacao: lista[0].endereco || '', descricao: lista[0].descricao || '', horario: lista[0].horario_funcionamento || '' });
       }
     } catch { setErro('Erro ao carregar restaurante'); }
-    finally { setCarregandoRestaurante(false); }
-  };
+  }, []);
 
   const carregarMesas = useCallback(async () => {
     try {
@@ -99,9 +108,9 @@ const OwnerDashboard = () => {
     finally { setCarregandoMesas(false); }
   }, []);
 
-  const carregarReservas = useCallback(async () => {
+  const carregarReservas = useCallback(async (silencioso = false) => {
     try {
-      setCarregandoReservas(true);
+      if (!silencioso) setCarregandoReservas(true);
       const r = await restaurantesService.meusRestaurantes();
       const lista = extrairLista<Restaurante>(r);
       if (lista.length > 0) {
@@ -109,8 +118,30 @@ const OwnerDashboard = () => {
         setReservas(extrairLista<Reserva>(res));
       }
     } catch { setErro('Erro ao carregar reservas'); }
-    finally { setCarregandoReservas(false); }
+    finally { if (!silencioso) setCarregandoReservas(false); }
   }, []);
+
+  // Atualização automática das reservas enquanto a aba está aberta.
+  useEffect(() => {
+    if (abaAtiva !== 'reservas') return;
+
+    const atualizar = () => {
+      if (document.visibilityState === 'visible') {
+        carregarReservas(true);
+      }
+    };
+
+    atualizar();
+    const intervalId = window.setInterval(atualizar, 10000);
+    window.addEventListener('focus', atualizar);
+    document.addEventListener('visibilitychange', atualizar);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', atualizar);
+      document.removeEventListener('visibilitychange', atualizar);
+    };
+  }, [abaAtiva, carregarReservas]);
 
   const carregarFuncionariosMock = () => {
     setFuncionarios([
@@ -119,6 +150,115 @@ const OwnerDashboard = () => {
       { id: 3, nome: 'Ricardo Souza', email: 'ricardo@restaurante.com', cargo: 'Gerente' },
     ]);
   };
+
+  // ── Dados iniciais ──
+  const carregarTudo = useCallback(async () => {
+    await Promise.all([carregarRestaurante(), carregarMesas(), carregarReservas()]);
+    carregarFuncionariosMock();
+  }, [carregarMesas, carregarReservas, carregarRestaurante]);
+
+  useEffect(() => { carregarTudo(); }, [carregarTudo]);
+
+  const carregarRelatorios = useCallback(async () => {
+    if (!restaurante) return;
+
+    try {
+      setCarregandoRelatorios(true);
+
+      const hoje = toISODate(new Date());
+      const inicioSemana = diasAtrasISO(6);
+      const inicioUltimos30Dias = diasAtrasISO(30);
+
+      const [ocupacaoResp, horariosResp, estatisticasResp] = await Promise.all([
+        reservasService.ocupacao({
+          restaurante_id: restaurante.id,
+          data_inicio: inicioSemana,
+          data_fim: hoje,
+        }),
+        reservasService.horariosMovimentados({
+          restaurante_id: restaurante.id,
+          data_inicio: inicioUltimos30Dias,
+          data_fim: hoje,
+          top: 6,
+        }),
+        reservasService.estatisticasPeriodo({
+          restaurante_id: restaurante.id,
+          data_inicio: inicioUltimos30Dias,
+          data_fim: hoje,
+          tipo_periodo: 'dia',
+        }),
+      ]);
+
+      const dadosOcupacao = ocupacaoResp?.dados || [];
+      const serieDia = dadosOcupacao.map(item => ({
+        dia: abreviarData(item.data),
+        taxa: Number(item.percentual_ocupacao),
+      }));
+
+      const dadosPorDia = estatisticasResp?.dados || [];
+      const serieMes = dadosPorDia.map(item => ({
+        mes: item.periodo,
+        reservas: item.total_reservas,
+      }));
+
+      // Calcular taxa média de ocupação com fallback para taxa de confirmação
+      let taxaMedia = 0;
+      
+      if (dadosOcupacao.length > 0) {
+        const ocupacaoValida = dadosOcupacao.filter(item => Number(item.percentual_ocupacao) > 0);
+        if (ocupacaoValida.length > 0) {
+          taxaMedia = ocupacaoValida.reduce((acc, item) => acc + Number(item.percentual_ocupacao), 0) / ocupacaoValida.length;
+        }
+      }
+      
+      // Fallback: usar taxa de confirmação se ocupação não disponível
+      if (taxaMedia === 0 && dadosPorDia.length > 0) {
+        const totalReservas = dadosPorDia.reduce((acc, item) => acc + item.total_reservas, 0);
+        const totalConfirmadas = dadosPorDia.reduce((acc, item) => acc + item.reservas_confirmadas, 0);
+        if (totalReservas > 0) {
+          taxaMedia = (totalConfirmadas / totalReservas) * 100;
+        }
+      }
+
+      const horarioPico = formatarHora(horariosResp?.dados?.[0]?.horario);
+      
+      // Total de reservas dos últimos 30 dias
+      const reservasMesAtual = dadosPorDia.reduce((acc, item) => acc + item.total_reservas, 0);
+
+      setKpisRelatorio({
+        taxaOcupacaoMedia: Math.round(taxaMedia),
+        horarioPico,
+        reservasMesAtual,
+      });
+      setDadosDia(serieDia);
+      setDadosMes(serieMes);
+    } catch {
+      setErro('Erro ao carregar relatórios');
+    } finally {
+      setCarregandoRelatorios(false);
+    }
+  }, [restaurante]);
+
+  useEffect(() => {
+    if (abaAtiva !== 'relatorios' || !restaurante) return;
+
+    const atualizar = () => {
+      if (document.visibilityState === 'visible') {
+        carregarRelatorios();
+      }
+    };
+
+    atualizar();
+    const intervalId = window.setInterval(atualizar, 15000);
+    window.addEventListener('focus', atualizar);
+    document.addEventListener('visibilitychange', atualizar);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', atualizar);
+      document.removeEventListener('visibilitychange', atualizar);
+    };
+  }, [abaAtiva, restaurante, carregarRelatorios]);
 
 
 
@@ -177,19 +317,27 @@ const OwnerDashboard = () => {
     finally { setCarregandoAcao(false); }
   };
 
+  const handleConcluirReserva = async (reserva: Reserva) => {
+    try {
+      setCarregandoAcao(true);
+      await reservasService.concluir(reserva.id);
+      carregarReservas();
+      feedback('Reserva concluída!');
+    } catch { setErro('Erro ao concluir'); }
+    finally { setCarregandoAcao(false); }
+  };
+
   // ── Perfil: ações ──
   const handleSalvarRestaurante = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!restaurante) return;
     try {
       setCarregandoAcao(true);
-      const horario = formRestaurante.horario.split('-').map(h => h.trim());
       await restaurantesService.atualizar(restaurante.id, {
         nome: formRestaurante.nome,
         endereco: formRestaurante.localizacao,
         descricao: formRestaurante.descricao,
-        horario_abertura: horario[0] || '11:00',
-        horario_fechamento: horario[1] || '23:00'
+        horario_funcionamento: formRestaurante.horario || ''
       });
       await carregarRestaurante();
       feedback('Restaurante atualizado!');
@@ -236,16 +384,6 @@ const OwnerDashboard = () => {
     }
   };
   const textoStatus = (s: string) => ({ confirmada: 'Confirmada', ativa: 'Ativa', pendente: 'Pendente', cancelada: 'Cancelada', concluida: 'Concluída' }[s] || s);
-
-  // ── Dados de relatórios (mock) ──
-  const dadosDia = [
-    { dia: 'Seg', taxa: 65 }, { dia: 'Ter', taxa: 70 }, { dia: 'Qua', taxa: 55 },
-    { dia: 'Qui', taxa: 78 }, { dia: 'Sex', taxa: 95 }, { dia: 'Sáb', taxa: 100 }, { dia: 'Dom', taxa: 80 },
-  ];
-  const dadosMes = [
-    { mes: 'Jan', reservas: 110 }, { mes: 'Fev', reservas: 130 }, { mes: 'Mar', reservas: 170 },
-    { mes: 'Abr', reservas: 150 }, { mes: 'Mai', reservas: 200 }, { mes: 'Jun', reservas: 220 },
-  ];
 
   // ── Abas ──
   const abas: { key: Aba; label: string; emoji: string }[] = [
@@ -354,6 +492,9 @@ const OwnerDashboard = () => {
                       {r.status === 'pendente' && (
                         <button onClick={() => handleConfirmarReserva(r)} disabled={carregandoAcao} style={{ ...btnGold, padding: '5px 14px', fontSize: '0.82rem' }}>Confirmar</button>
                       )}
+                      {r.status === 'confirmada' && (
+                        <button onClick={() => handleConcluirReserva(r)} disabled={carregandoAcao} style={{ backgroundColor: '#3f3f46', border: 'none', color: '#fff', borderRadius: 7, padding: '5px 14px', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer' }}>Concluir</button>
+                      )}
                       {(r.status === 'pendente' || r.status === 'confirmada') && (
                         <button onClick={() => handleCancelarReserva(r)} disabled={carregandoAcao} style={{ backgroundColor: '#e05555', border: 'none', color: '#fff', borderRadius: 7, padding: '5px 14px', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer' }}>Cancelar</button>
                       )}
@@ -434,44 +575,62 @@ const OwnerDashboard = () => {
           <div>
             <h2 style={{ fontWeight: 700, fontSize: '1.1rem', color: '#1a1a1a', marginBottom: 24 }}>Relatórios e Métricas</h2>
 
-            {/* KPIs */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-              {[{ valor: '85%', label: 'Taxa de Ocupação' }, { valor: '19:00', label: 'Horário de Pico' }, { valor: '180', label: 'Reservas este Mês' }].map(k => (
-                <div key={k.label} style={{ ...cardStyle, textAlign: 'center', padding: '24px 16px' }}>
-                  <p style={{ color: GOLD, fontSize: '2.2rem', fontWeight: 700, marginBottom: 6 }}>{k.valor}</p>
-                  <p style={{ color: '#666', fontSize: '0.9rem' }}>{k.label}</p>
+            {carregandoRelatorios ? (
+              <div className="flex justify-center py-12">
+                <div className="animate-spin rounded-full" style={{ width: 36, height: 36, border: '4px solid #e5d9c8', borderTopColor: GOLD }} />
+              </div>
+            ) : (
+              <>
+                {/* KPIs */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                  {[
+                    { valor: `${kpisRelatorio.taxaOcupacaoMedia}%`, label: 'Taxa Média de Ocupação' },
+                    { valor: kpisRelatorio.horarioPico, label: 'Horário de Pico' },
+                    { valor: String(kpisRelatorio.reservasMesAtual), label: 'Reservas no Mês Atual' },
+                  ].map(k => (
+                    <div key={k.label} style={{ ...cardStyle, textAlign: 'center', padding: '24px 16px' }}>
+                      <p style={{ color: GOLD, fontSize: '2.2rem', fontWeight: 700, marginBottom: 6 }}>{k.valor}</p>
+                      <p style={{ color: '#666', fontSize: '0.9rem' }}>{k.label}</p>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
 
-            {/* Gráficos */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div style={{ ...cardStyle, padding: '20px 24px' }}>
-                <p style={{ fontWeight: 600, fontSize: '0.9rem', color: '#555', marginBottom: 16 }}>Taxa de Ocupação por Dia</p>
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={dadosDia}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0ece6" />
-                    <XAxis dataKey="dia" tick={{ fontSize: 12, fill: '#888' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 12, fill: '#888' }} axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e5ddd5' }} />
-                    <Bar dataKey="taxa" fill={GOLD} radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+                {/* Gráficos */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div style={{ ...cardStyle, padding: '20px 24px' }}>
+                    <p style={{ fontWeight: 600, fontSize: '0.9rem', color: '#555', marginBottom: 16 }}>Taxa de Ocupação por Dia</p>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={dadosDia}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0ece6" />
+                        <XAxis dataKey="dia" tick={{ fontSize: 12, fill: '#888' }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 12, fill: '#888' }} axisLine={false} tickLine={false} />
+                        <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e5ddd5' }} />
+                        <Bar dataKey="taxa" fill={GOLD} radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
 
-              <div style={{ ...cardStyle, padding: '20px 24px' }}>
-                <p style={{ fontWeight: 600, fontSize: '0.9rem', color: '#555', marginBottom: 16 }}>Reservas por Mês</p>
-                <ResponsiveContainer width="100%" height={220}>
-                  <LineChart data={dadosMes}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0ece6" />
-                    <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#888' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 12, fill: '#888' }} axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e5ddd5' }} />
-                    <Line type="monotone" dataKey="reservas" stroke={GOLD} strokeWidth={2.5} dot={{ fill: GOLD, r: 4 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
+                  <div style={{ ...cardStyle, padding: '20px 24px' }}>
+                    <p style={{ fontWeight: 600, fontSize: '0.9rem', color: '#555', marginBottom: 16 }}>Reservas por Mês</p>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <LineChart data={dadosMes}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0ece6" />
+                        <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#888' }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 12, fill: '#888' }} axisLine={false} tickLine={false} />
+                        <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e5ddd5' }} />
+                        <Line type="monotone" dataKey="reservas" stroke={GOLD} strokeWidth={2.5} dot={{ fill: GOLD, r: 4 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {dadosDia.length === 0 && dadosMes.length === 0 && (
+                  <p style={{ color: '#888', textAlign: 'center', marginTop: 20 }}>
+                    Ainda não há dados suficientes para montar os gráficos.
+                  </p>
+                )}
+              </>
+            )}
           </div>
         )}
 

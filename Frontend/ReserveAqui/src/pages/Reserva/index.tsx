@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Header, Footer } from '../../components/layout';
 import { reservasService, restaurantesService, mesasService } from '../../services/api';
-import type { Restaurante, Mesa } from '../../types';
+import type { Restaurante } from '../../types';
 import { useAuth } from '../../context';
 
 const GOLD = '#C9922A';
@@ -16,7 +16,6 @@ const Reserva = () => {
   const { usuario, isAuthenticated } = useAuth();
 
   const [restaurante, setRestaurante] = useState<Restaurante | null>(null);
-  const [mesas, setMesas] = useState<Mesa[]>([]);
   const [mesasDisponibilidade, setMesasDisponibilidade] = useState<{ disponivel: boolean; mesas_necessarias: number; mensagem?: string } | null>(null);
   const [carregandoRestaurante, setCarregandoRestaurante] = useState(true);
   const [carregandoReserva, setCarregandoReserva] = useState(false);
@@ -49,14 +48,33 @@ const Reserva = () => {
     }
   }, [restaurante, formData.quantidadePessoas, formData.data, formData.horario]);
 
+  useEffect(() => {
+    if (!restaurante || !formData.data || !formData.horario || !formData.quantidadePessoas) return;
+
+    const atualizar = () => {
+      if (document.visibilityState === 'visible') {
+        validarDisponibilidade();
+      }
+    };
+
+    const intervalId = window.setInterval(atualizar, 10000);
+    window.addEventListener('focus', atualizar);
+    document.addEventListener('visibilitychange', atualizar);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', atualizar);
+      document.removeEventListener('visibilitychange', atualizar);
+    };
+  }, [restaurante, formData.data, formData.horario, formData.quantidadePessoas]);
+
   const carregarRestaurante = async () => {
     try {
       setCarregandoRestaurante(true);
       setErro('');
       const restauranteData = await restaurantesService.obter(Number(id));
       setRestaurante(restauranteData);
-      const mesasResponse = await mesasService.listar({ restaurante: Number(id), ativa: true });
-      setMesas(mesasResponse.results || []);
+      await mesasService.listar({ restaurante: Number(id), ativa: true });
     } catch {
       setErro('Não foi possível carregar os detalhes do restaurante.');
     } finally {
@@ -219,8 +237,6 @@ const Reserva = () => {
       </Shell>
     );
   }
-
-  const mesasCount = mesas.length;
 
   // Opções de nº de pessoas
   const pessoasOpts = Array.from({ length: 10 }, (_, i) => i + 1);

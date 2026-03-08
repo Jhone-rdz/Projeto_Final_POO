@@ -81,7 +81,8 @@ class ReservaCreateUpdateSerializer(serializers.ModelSerializer):
     
     def validate(self, data):
         """Validações gerais"""
-        # Validar data e horário não podem ser no passado
+        # REGRA CRÍTICA: Data e horário NÃO podem ser no passado
+        # Cliente não pode faire reservas antes de agora + 30 minutos
         data_reserva = data.get('data_reserva')
         horario = data.get('horario')
         
@@ -92,9 +93,14 @@ class ReservaCreateUpdateSerializer(serializers.ModelSerializer):
             limite_minimo = timezone.now() + timedelta(minutes=30)
             
             if data_hora_reserva < limite_minimo:
-                raise serializers.ValidationError(
-                    'Reservas devem ser feitas com no mínimo 30 minutos de antecedência.'
-                )
+                tempo_espera = (limite_minimo - timezone.now()).total_seconds() / 60
+                raise serializers.ValidationError({
+                    'data_reserva': 'Data no passado ou sem antecedência mínima.',
+                    'horario': 'Horário no passado ou sem antecedência mínima.',
+                    'detail': f'Reservas devem ser feitas com no mínimo 30 minutos de antecedência. '
+                             f'Próximo horário disponível: {limite_minimo.strftime("%d/%m/%Y às %H:%M")}. '
+                             f'Tempo até liberação: {int(tempo_espera)} minutos.'
+                })
         
         # Validar quantidade de pessoas
         quantidade_pessoas = data.get('quantidade_pessoas')

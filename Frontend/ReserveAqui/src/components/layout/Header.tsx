@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context';
-import { Button } from '../common';
 import { notificacoesService } from '../../services/api';
 import type { Notificacao } from '../../types';
 
@@ -54,6 +53,28 @@ export const Header = () => {
   }, [notificacoesAbertas, isCliente]);
 
   useEffect(() => {
+    if (!notificacoesAbertas || !isCliente) return;
+
+    const atualizar = () => {
+      if (document.visibilityState === 'visible') {
+        carregarNotificacoes();
+        carregarContadorNaoLidas();
+      }
+    };
+
+    atualizar();
+    const intervalId = window.setInterval(atualizar, 10000);
+    window.addEventListener('focus', atualizar);
+    document.addEventListener('visibilitychange', atualizar);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', atualizar);
+      document.removeEventListener('visibilitychange', atualizar);
+    };
+  }, [notificacoesAbertas, isCliente]);
+
+  useEffect(() => {
     if (isAuthenticated && isCliente) {
       carregarContadorNaoLidas();
       const interval = setInterval(carregarContadorNaoLidas, 30000);
@@ -65,7 +86,8 @@ export const Header = () => {
     try {
       setCarregandoNotificacoes(true);
       const response = await notificacoesService.listar();
-      setNotificacoes(response.results || []);
+      const lista = Array.isArray(response) ? response : (response.results || []);
+      setNotificacoes(lista);
     } catch (error) {
       console.error('Erro ao carregar notificações:', error);
     } finally {
@@ -324,6 +346,12 @@ export const Header = () => {
                         className="block px-4 py-2 text-sm font-medium"
                         style={{ color: '#ddd', textDecoration: 'none' }}
                       >🔧 Dashboard Admin</Link>
+                    )}
+                    {usuario.papeis?.some(p => p.tipo === 'cliente') && (
+                      <Link to="/profile" onClick={() => setPerfilAberto(false)}
+                        className="block px-4 py-2 text-sm font-medium"
+                        style={{ color: '#ddd', textDecoration: 'none' }}
+                      >👤 Meu Perfil</Link>
                     )}
                     <button
                       onClick={() => { logout(); setPerfilAberto(false); }}
