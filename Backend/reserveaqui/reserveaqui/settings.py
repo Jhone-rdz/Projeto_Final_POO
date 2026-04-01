@@ -27,6 +27,11 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-9wm_db(aoq9xw#b(g6iya
 DEBUG = config('DEBUG', default=True, cast=bool)
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
+CSRF_TRUSTED_ORIGINS = config(
+    'CSRF_TRUSTED_ORIGINS',
+    default='http://localhost,http://127.0.0.1',
+    cast=Csv()
+)
 
 
 # Application definition
@@ -84,12 +89,27 @@ WSGI_APPLICATION = 'reserveaqui.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+DB_ENGINE = config('DB_ENGINE', default='postgres').lower()
+
+if DB_ENGINE == 'postgres':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('POSTGRES_DB', default='reserveaqui'),
+            'USER': config('POSTGRES_USER', default='reserveaqui'),
+            'PASSWORD': config('POSTGRES_PASSWORD', default='reserveaqui123'),
+            'HOST': config('POSTGRES_HOST', default='db'),
+            'PORT': config('POSTGRES_PORT', default='5432'),
+            'CONN_MAX_AGE': config('POSTGRES_CONN_MAX_AGE', default=60, cast=int),
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
@@ -126,7 +146,8 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Custom User Model
 AUTH_USER_MODEL = 'usuarios.Usuario'
@@ -190,7 +211,7 @@ CORS_ALLOWED_ORIGINS = config(
 # ]
 
 # Em desenvolvimento, permitir todos (CUIDADO: apenas para desenvolvimento!)
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=False, cast=bool)
 
 # Configurações adicionais de CORS
 CORS_ALLOW_CREDENTIALS = True
@@ -205,3 +226,12 @@ CORS_ALLOW_HEADERS = [
     'x-csrftoken',
     'x-requested-with',
 ]
+
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=False, cast=bool)
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = 'DENY'
