@@ -1,5 +1,16 @@
 # React + TypeScript + Vite
 
+## Deploy no Netlify
+
+1. Crie um novo site no Netlify conectado a este repositorio.
+2. Configure o Base directory como `Frontend/ReserveAqui`.
+3. Defina a variavel de ambiente `VITE_API_URL` com a URL da API no Render, por exemplo `https://seu-backend.onrender.com/api`.
+4. O projeto ja possui `netlify.toml` com:
+   - build command: `npm run build`
+   - publish directory: `dist`
+   - redirect SPA para `index.html`
+5. Faça deploy e teste rotas como `/login`, `/profile` e `/restaurantes/:id` recarregando a pagina.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:

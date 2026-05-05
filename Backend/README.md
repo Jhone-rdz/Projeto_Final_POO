@@ -93,6 +93,22 @@ python manage.py runserver
 # Acesse: http://127.0.0.1:8000/
 ```
 
+### Troubleshooting do ambiente virtual
+
+Se o comando `pip install -r ../requirements.txt` falhar com erro de importação do Python, como `No module named '_posixsubprocess'`, o ambiente virtual foi criado com uma instalação de Python quebrada ou incompleta.
+
+Nesse caso:
+
+```bash
+rm -rf venv
+python3 -m venv venv
+source venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r ../requirements.txt
+```
+
+Se continuar falhando, use a versão do Python configurada pelo workspace ou recrie o venv com uma instalação oficial do Python 3.12+.
+
 ---
 
 ## Setup Inicial - Passo a Passo
