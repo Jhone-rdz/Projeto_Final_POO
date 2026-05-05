@@ -43,9 +43,10 @@ class Command(BaseCommand):
         )
 
         # Criar admin
-        admin = User.objects.create_superuser(
+            admin = User.objects.create_superuser(
             email=email,
             password=password,
+                username=email.split('@')[0],
             nome='Administrador',
         )
 
