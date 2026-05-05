@@ -10,8 +10,14 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import logging
 from pathlib import Path
-from decouple import config, Csv
+
+import dj_database_url
+import sentry_sdk
+from decouple import Csv, config
+from sentry_sdk.integrations.django import DjangoIntegration
+from sentry_sdk.integrations.logging import LoggingIntegration
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -32,6 +38,24 @@ CSRF_TRUSTED_ORIGINS = config(
     default='http://localhost,http://127.0.0.1',
     cast=Csv()
 )
+
+
+SENTRY_DSN = config('SENTRY_DSN', default='')
+SENTRY_ENVIRONMENT = config('SENTRY_ENVIRONMENT', default='development')
+SENTRY_TRACES_SAMPLE_RATE = config('SENTRY_TRACES_SAMPLE_RATE', default=0.1, cast=float)
+SENTRY_SEND_DEFAULT_PII = config('SENTRY_SEND_DEFAULT_PII', default=False, cast=bool)
+
+if SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[
+            DjangoIntegration(),
+            LoggingIntegration(level=logging.INFO, event_level=logging.ERROR),
+        ],
+        environment=SENTRY_ENVIRONMENT,
+        traces_sample_rate=SENTRY_TRACES_SAMPLE_RATE,
+        send_default_pii=SENTRY_SEND_DEFAULT_PII,
+    )
 
 
 # Application definition
@@ -58,6 +82,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -92,17 +117,28 @@ WSGI_APPLICATION = 'reserveaqui.wsgi.application'
 DB_ENGINE = config('DB_ENGINE', default='postgres').lower()
 
 if DB_ENGINE == 'postgres':
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': config('POSTGRES_DB', default='reserveaqui'),
-            'USER': config('POSTGRES_USER', default='reserveaqui'),
-            'PASSWORD': config('POSTGRES_PASSWORD', default='reserveaqui123'),
-            'HOST': config('POSTGRES_HOST', default='db'),
-            'PORT': config('POSTGRES_PORT', default='5432'),
-            'CONN_MAX_AGE': config('POSTGRES_CONN_MAX_AGE', default=60, cast=int),
+    database_url = config('DATABASE_URL', default='').strip()
+
+    if database_url:
+        DATABASES = {
+            'default': dj_database_url.parse(
+                database_url,
+                conn_max_age=config('POSTGRES_CONN_MAX_AGE', default=60, cast=int),
+                ssl_require=config('POSTGRES_SSL_REQUIRE', default=True, cast=bool),
+            )
         }
-    }
+    else:
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': config('POSTGRES_DB', default='reserveaqui'),
+                'USER': config('POSTGRES_USER', default='reserveaqui'),
+                'PASSWORD': config('POSTGRES_PASSWORD', default='reserveaqui123'),
+                'HOST': config('POSTGRES_HOST', default='db'),
+                'PORT': config('POSTGRES_PORT', default='5432'),
+                'CONN_MAX_AGE': config('POSTGRES_CONN_MAX_AGE', default=60, cast=int),
+            }
+        }
 else:
     DATABASES = {
         'default': {

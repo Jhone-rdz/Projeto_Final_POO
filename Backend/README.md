@@ -49,6 +49,20 @@ API REST para gerenciamento de reservas de mesas em restaurantes, desenvolvida e
 - python-decouple 3.8
 - django-cors-headers 4.3.1
 - drf-spectacular 0.27.0
+- sentry-sdk 2.x
+
+## Observabilidade
+
+O backend pode enviar erros e traces para o Sentry quando a variável `SENTRY_DSN` estiver configurada.
+
+Variáveis disponíveis:
+
+```bash
+SENTRY_DSN=
+SENTRY_ENVIRONMENT=production
+SENTRY_TRACES_SAMPLE_RATE=0.1
+SENTRY_SEND_DEFAULT_PII=False
+```
 
 ## Quick Start (Setup Rápido)
 
