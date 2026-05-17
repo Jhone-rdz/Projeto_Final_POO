@@ -31,7 +31,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-9wm_db(aoq9xw#b(g6iyag*^nrvafut^)a!p+rhc-h)jdxzh9n')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', default=True, cast=bool)
+# Default to False to avoid accidentally enabling debug when .env is missing.
+DEBUG = config('DEBUG', default=False, cast=bool)
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
 CSRF_TRUSTED_ORIGINS = config(
@@ -45,6 +46,7 @@ SENTRY_DSN = config('SENTRY_DSN', default='')
 SENTRY_ENVIRONMENT = config('SENTRY_ENVIRONMENT', default='development')
 SENTRY_TRACES_SAMPLE_RATE = config('SENTRY_TRACES_SAMPLE_RATE', default=0.1, cast=float)
 SENTRY_SEND_DEFAULT_PII = config('SENTRY_SEND_DEFAULT_PII', default=False, cast=bool)
+SENTRY_ENABLE_LOGS = config('SENTRY_ENABLE_LOGS', default=False, cast=bool)
 
 if SENTRY_DSN:
     sentry_sdk.init(
@@ -56,6 +58,7 @@ if SENTRY_DSN:
         environment=SENTRY_ENVIRONMENT,
         traces_sample_rate=SENTRY_TRACES_SAMPLE_RATE,
         send_default_pii=SENTRY_SEND_DEFAULT_PII,
+        enable_logs=SENTRY_ENABLE_LOGS,
     )
 
 
@@ -125,7 +128,8 @@ if DB_ENGINE == 'postgres':
             'default': dj_database_url.parse(
                 database_url,
                 conn_max_age=config('POSTGRES_CONN_MAX_AGE', default=60, cast=int),
-                ssl_require=config('POSTGRES_SSL_REQUIRE', default=True, cast=bool),
+                # Não exigir SSL por padrão para ambientes de desenvolvimento/local.
+                ssl_require=config('POSTGRES_SSL_REQUIRE', default=False, cast=bool),
             )
         }
     else:

@@ -41,6 +41,10 @@ services:
     restart: "no"
     volumes:
       - frontend_dist:/frontend-dist
+    # Copia os arquivos estáticos gerados para o volume nomeado quando o container for criado.
+    # O container usa a imagem final (nginx) que já contém /usr/share/nginx/html.
+    # O comando abaixo copia esses arquivos para o volume e então finaliza.
+    command: sh -c "cp -r /usr/share/nginx/html/. /frontend-dist && echo 'frontend assets copied'"
 
   nginx:
     image: nginx:1.27-alpine
