@@ -237,8 +237,7 @@ export const Home = () => {
         </div>
       </section>
 
-      {/* Debug: Botão para testar Sentry (apenas em desenvolvimento) */}
-      {import.meta.env.MODE === 'development' && (
+      {/* Debug: Botão para testar Sentry */}
         <div className="w-full flex justify-center py-4" style={{ backgroundColor: '#F5F0EA', borderTop: '1px solid #ddd' }}>
           <button
             onClick={() => {
@@ -263,7 +262,6 @@ export const Home = () => {
             🧪 Testar Sentry
           </button>
         </div>
-      )}
 
       <Footer />
     </div>
