@@ -7,9 +7,13 @@ from .validators import validar_forca_senha
 
 class PapelModelTest(TestCase):
     """Testes para o modelo Papel"""
+
+    def _reset_papel(self, tipo):
+        Papel.objects.filter(tipo=tipo).delete()
     
     def test_criar_papel_valido(self):
         """Teste de criação de papel com dados válidos"""
+        self._reset_papel('admin_sistema')
         papel = Papel.objects.create(
             tipo='admin_sistema',
             descricao='Administrador do Sistema'
@@ -21,6 +25,7 @@ class PapelModelTest(TestCase):
     
     def test_tipo_papel_unico(self):
         """Teste que tipo de papel deve ser único"""
+        self._reset_papel('admin_sistema')
         Papel.objects.create(tipo='admin_sistema', descricao='Admin')
         
         with self.assertRaises(IntegrityError):
@@ -28,6 +33,7 @@ class PapelModelTest(TestCase):
     
     def test_papel_str(self):
         """Teste da representação em string do papel"""
+        self._reset_papel('cliente')
         papel = Papel.objects.create(tipo='cliente', descricao='Usuário Cliente')
         self.assertEqual(str(papel), 'Cliente')
     
@@ -41,6 +47,7 @@ class PapelModelTest(TestCase):
         ]
         
         for tipo in tipos_esperados:
+            self._reset_papel(tipo)
             papel = Papel.objects.create(tipo=tipo)
             self.assertEqual(Papel.objects.filter(tipo=tipo).count(), 1)
 
@@ -50,8 +57,8 @@ class UsuarioModelTest(TestCase):
     
     def setUp(self):
         """Criar papéis para os testes"""
-        self.papel_cliente = Papel.objects.create(tipo='cliente')
-        self.papel_admin = Papel.objects.create(tipo='admin_sistema')
+        self.papel_cliente, _ = Papel.objects.get_or_create(tipo='cliente')
+        self.papel_admin, _ = Papel.objects.get_or_create(tipo='admin_sistema')
     
     def test_criar_usuario_valido(self):
         """Teste de criação de usuário com dados válidos"""
@@ -159,7 +166,7 @@ class UsuarioPapelModelTest(TestCase):
             password='SenhaForte123'
         )
         
-        self.papel = Papel.objects.create(tipo='funcionario')
+        self.papel, _ = Papel.objects.get_or_create(tipo='funcionario')
     
     def test_criar_usuario_papel_valido(self):
         """Teste de criação de relacionamento usuario-papel"""

@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone as dt_timezone
 from .models import Mesa
 from .serializers import MesaSerializer, MesaListSerializer
 from .permissions import IsAdminForWriteOrReadOnly, IsAdminOrProprietarioRestaurante, IsFuncionarioOrHigher
@@ -161,15 +161,13 @@ class MesaViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Verificar se a data/horário é no futuro (mínimo 30 minutos)
-        data_hora_reserva = timezone.make_aware(
-            datetime.combine(data_reserva, horario_reserva)
-        )
-        tempo_minimo = timezone.now() + timedelta(minutes=30)
+        # Verificar se a data/horário é no futuro (mínimo 2 horas)
+        data_hora_reserva = datetime.combine(data_reserva, horario_reserva, tzinfo=dt_timezone.utc)
+        tempo_minimo = timezone.now() + timedelta(minutes=120)
         
         if data_hora_reserva < tempo_minimo:
             return Response(
-                {"error": "A reserva deve ser no mínimo 30 minutos no futuro."},
+                {"error": "A reserva deve ser no mínimo 2 horas no futuro."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         

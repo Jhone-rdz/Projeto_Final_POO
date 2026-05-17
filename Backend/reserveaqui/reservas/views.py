@@ -197,22 +197,20 @@ class ReservaViewSet(viewsets.ModelViewSet):
         
         if data_reserva_str and horario_str:
             try:
-                from datetime import datetime
                 data_reserva = datetime.strptime(data_reserva_str, '%Y-%m-%d').date()
                 horario = datetime.strptime(horario_str, '%H:%M:%S').time() if ':' in horario_str else datetime.strptime(horario_str, '%H:%M').time()
-                data_hora_reserva = timezone.make_aware(
-                    datetime.combine(data_reserva, horario)
-                )
+                from datetime import timezone as dt_timezone
+                data_hora_reserva = datetime.combine(data_reserva, horario, tzinfo=dt_timezone.utc)
                 
-                # Você NÃO pode fazer reservas para antes da data/hora atual + 30 minutos
-                limite_minimo = timezone.now() + timedelta(minutes=30)
+                # Você NÃO pode fazer reservas para antes da data/hora atual + 2 horas
+                limite_minimo = timezone.now() + timedelta(minutes=120)
                 
                 if data_hora_reserva < limite_minimo:
                     return Response(
                         {
                             'error': 'Data e horário inválidos',
-                            'detail': 'Reservas devem ser feitas com no mínimo 30 minutos de antecedência. '
-                                     f'Próximo horário disponível: {(timezone.now() + timedelta(minutes=30)).strftime("%d/%m/%Y às %H:%M")}'
+                            'detail': 'Reservas devem ser feitas com no mínimo 2 horas de antecedência. '
+                                     f'Próximo horário disponível: {(timezone.now() + timedelta(minutes=120)).strftime("%d/%m/%Y às %H:%M")}'
                         },
                         status=status.HTTP_400_BAD_REQUEST
                     )
@@ -418,7 +416,7 @@ class ReservaViewSet(viewsets.ModelViewSet):
         
         # Verificar se pode cancelar
         # Proprietários/admins podem cancelar qualquer reserva
-        # Clientes só podem cancelar com 30 minutos de antecedência
+        # Clientes só podem cancelar com 2 horas de antecedência
         is_proprietario = user == reserva.restaurante.proprietario or user.usuariopapel_set.filter(
             papel__tipo__in=['admin_sistema', 'admin_secundario']
         ).exists()
@@ -427,7 +425,7 @@ class ReservaViewSet(viewsets.ModelViewSet):
             # Cliente: verificar restrições de tempo
             if not reserva.pode_cancelar():
                 return Response(
-                    {'error': 'Não é possível cancelar reservas com menos de 30 minutos de antecedência.'},
+                    {'error': 'Não é possível cancelar reservas com menos de 2 horas de antecedência.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 

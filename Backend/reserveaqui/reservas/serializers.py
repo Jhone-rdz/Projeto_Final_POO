@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.utils import timezone
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone as dt_timezone
 import math
 from .models import Reserva, ReservaMesa, Notificacao
 from mesas.models import Mesa
@@ -71,6 +71,8 @@ class ReservaListSerializer(serializers.ModelSerializer):
 
 class ReservaCreateUpdateSerializer(serializers.ModelSerializer):
     """Serializer para criação e atualização de reservas com validações"""
+
+    ANTECEDENCIA_MINIMA_MINUTOS = 120
     
     class Meta:
         model = Reserva
@@ -82,22 +84,20 @@ class ReservaCreateUpdateSerializer(serializers.ModelSerializer):
     def validate(self, data):
         """Validações gerais"""
         # REGRA CRÍTICA: Data e horário NÃO podem ser no passado
-        # Cliente não pode faire reservas antes de agora + 30 minutos
+        # Cliente não pode fazer reservas antes de agora + 2 horas
         data_reserva = data.get('data_reserva')
         horario = data.get('horario')
         
         if data_reserva and horario:
-            data_hora_reserva = timezone.make_aware(
-                datetime.combine(data_reserva, horario)
-            )
-            limite_minimo = timezone.now() + timedelta(minutes=30)
+            data_hora_reserva = datetime.combine(data_reserva, horario, tzinfo=dt_timezone.utc)
+            limite_minimo = timezone.now() + timedelta(minutes=self.ANTECEDENCIA_MINIMA_MINUTOS)
             
             if data_hora_reserva < limite_minimo:
                 tempo_espera = (limite_minimo - timezone.now()).total_seconds() / 60
                 raise serializers.ValidationError({
                     'data_reserva': 'Data no passado ou sem antecedência mínima.',
                     'horario': 'Horário no passado ou sem antecedência mínima.',
-                    'detail': f'Reservas devem ser feitas com no mínimo 30 minutos de antecedência. '
+                    'detail': f'Reservas devem ser feitas com no mínimo 2 horas de antecedência. '
                              f'Próximo horário disponível: {limite_minimo.strftime("%d/%m/%Y às %H:%M")}. '
                              f'Tempo até liberação: {int(tempo_espera)} minutos.'
                 })
@@ -204,14 +204,12 @@ class ReservaCreateUpdateSerializer(serializers.ModelSerializer):
             )
         
         # Validar se a edição está sendo feita com antecedência
-        data_hora_reserva = timezone.make_aware(
-            datetime.combine(instance.data_reserva, instance.horario)
-        )
-        limite_edicao = data_hora_reserva - timedelta(minutes=30)
+        data_hora_reserva = datetime.combine(instance.data_reserva, instance.horario, tzinfo=dt_timezone.utc)
+        limite_edicao = data_hora_reserva - timedelta(minutes=self.ANTECEDENCIA_MINIMA_MINUTOS)
         
         if timezone.now() > limite_edicao:
             raise serializers.ValidationError(
-                'Não é possível editar reservas com menos de 30 minutos de antecedência.'
+                'Não é possível editar reservas com menos de 2 horas de antecedência.'
             )
         
         # Se houver mudança em data, horário ou quantidade de pessoas, realocar mesas
