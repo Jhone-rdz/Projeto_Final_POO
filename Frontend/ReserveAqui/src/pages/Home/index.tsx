@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import * as Sentry from '@sentry/react';
 import { Header, Footer } from '../../components/layout';
 import { RestauranteCard } from '../../components/features';
 import { restaurantesService } from '../../services/api';
@@ -235,6 +236,34 @@ export const Home = () => {
           )}
         </div>
       </section>
+
+      {/* Debug: Botão para testar Sentry (apenas em desenvolvimento) */}
+      {import.meta.env.MODE === 'development' && (
+        <div className="w-full flex justify-center py-4" style={{ backgroundColor: '#F5F0EA', borderTop: '1px solid #ddd' }}>
+          <button
+            onClick={() => {
+              Sentry.logger.info('Frontend test error triggered from Home');
+              throw new Error('🧪 Teste Sentry Frontend - erro intencional');
+            }}
+            className="px-4 py-2 text-sm rounded font-medium transition-all"
+            style={{
+              backgroundColor: '#C9922A',
+              color: '#fff',
+              border: '1px solid #b07e1e',
+              cursor: 'pointer',
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#b07e1e';
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#C9922A';
+            }}
+            title="Clique para testar Sentry (apenas em desenvolvimento)"
+          >
+            🧪 Testar Sentry
+          </button>
+        </div>
+      )}
 
       <Footer />
     </div>
