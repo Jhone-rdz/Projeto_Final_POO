@@ -117,3 +117,6 @@ npm test
 ---
 
 Se quiser, aplico também as mudanças em pequenos commits separados (CI, Dockerfiles, logging, README).
+
+
+ajustes no docker hub
