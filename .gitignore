@@ -50,3 +50,11 @@ db.sqlite3-journal
 venv/
 env/
 ENV/
+
+# Playwright
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/

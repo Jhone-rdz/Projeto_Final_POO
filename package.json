@@ -1,0 +1,23 @@
+{
+  "name": "projeto_final_poo",
+  "version": "1.0.0",
+  "description": "Projeto Final — Sistema de reservas de mesas para restaurantes.",
+  "main": "index.js",
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jhone-rdz/Projeto_Final_POO.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Jhone-rdz/Projeto_Final_POO/issues"
+  },
+  "homepage": "https://github.com/Jhone-rdz/Projeto_Final_POO#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^25.9.2"
+  }
+}
